@@ -1,12 +1,18 @@
 """Padlet 電子聯絡簿監控：有新貼文或內容被修改時，傳 Telegram 通知。
 
+排程規則（台灣時間）：
+  - 上課日（依台灣政府行事曆，含補班日）12:50 後才檢查
+  - 當天的聯絡簿（標題是今天日期，例如 10/19）有內容且已傳送後，當天就不再檢查
+
 環境變數：
   FEED_URL         Padlet RSS 網址（含 token）
   TG_BOT_TOKEN     Telegram Bot token
   TG_CHAT_ID       你的 Telegram chat id
 參數：
   --test           直接把最新一篇傳出去（測試用）
+  --manual         手動執行：忽略時間、假日與「今日已完成」的限制
 """
+import datetime
 import hashlib
 import html
 import json
@@ -18,12 +24,29 @@ import urllib.request
 import xml.etree.ElementTree as ET
 
 STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state.json")
+TW = datetime.timezone(datetime.timedelta(hours=8))
+START_TIME = datetime.time(12, 50)
+CALENDAR_URL = "https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/{year}.json"
 
 
 def fetch(url, data=None):
     req = urllib.request.Request(url, data=data, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return r.read()
+
+
+def is_school_day(today):
+    """依台灣政府行事曆判斷是否上班（上課）日；抓不到行事曆時，以週一到週五為準。"""
+    try:
+        days = json.loads(fetch(CALENDAR_URL.format(year=today.year)))
+        for d in days:
+            if d["date"] == today.strftime("%Y%m%d"):
+                if d["isHoliday"] and d.get("description"):
+                    print("今天放假：", d["description"])
+                return not d["isHoliday"]
+    except Exception as e:
+        print("無法取得行事曆，改用週一到週五判斷：", e)
+    return today.weekday() < 5
 
 
 def html_to_text(s):
@@ -54,10 +77,16 @@ def digest(item):
     return hashlib.sha256((item["title"] + "\n" + item["text"] + "\n" + item["image"]).encode()).hexdigest()
 
 
+def is_today_card(item, today):
+    """標題是今天日期，例如 10/19、10／19。"""
+    m = re.match(r"\s*0?(\d{1,2})\s*[/／]\s*0?(\d{1,2})(?!\d)", item["title"])
+    return bool(m) and (int(m.group(1)), int(m.group(2))) == (today.month, today.day)
+
+
 def send(item, label):
     msg = f"📚 聯絡簿{label}：{item['title']}\n\n{item['text'] or '(無文字內容)'}"
     if item["image"]:
-        msg += f"\n\n🖼 附圖：{item['image']}"
+        msg += "\n\n🖼 有附圖，請點下方連結查看"
     msg += f"\n\n{item['link']}"
     data = urllib.parse.urlencode({
         "chat_id": os.environ["TG_CHAT_ID"],
@@ -68,6 +97,27 @@ def send(item, label):
 
 
 def main():
+    now = datetime.datetime.now(TW)
+    today = now.date()
+    manual = "--manual" in sys.argv or "--test" in sys.argv
+
+    first_run = not os.path.exists(STATE_FILE)
+    state = {} if first_run else json.load(open(STATE_FILE, encoding="utf-8"))
+    if state and "posts" not in state:  # 舊版格式
+        state = {"posts": state}
+    posts = state.get("posts", {})
+
+    if not manual:
+        if state.get("done") == today.isoformat():
+            print("今天的聯絡簿已經傳過了，不再檢查")
+            return
+        if now.time() < START_TIME:
+            print("還沒到 12:50，不檢查")
+            return
+        if not is_school_day(today):
+            print("今天不用上課，不檢查")
+            return
+
     items = load_items(os.environ["FEED_URL"])
 
     if "--test" in sys.argv:
@@ -75,23 +125,34 @@ def main():
         print("已傳送測試訊息：", items[-1]["title"])
         return
 
-    first_run = not os.path.exists(STATE_FILE)
-    state = {} if first_run else json.load(open(STATE_FILE, encoding="utf-8"))
-
-    new_state = {}
+    new_posts = {}
+    today_sent = False
     for item in items:
         # 只存雜湊值，不存內容（避免聯絡簿內容外流）
         key = hashlib.sha256(item["id"].encode()).hexdigest()[:16]
         h = digest(item)
-        new_state[key] = h
-        if first_run or state.get(key) == h:
+        new_posts[key] = h
+        has_content = bool(item["text"] or item["image"])
+
+        if is_today_card(item, today) and has_content:
+            # 今天的聯絡簿：不論是剛發還是老師之前就先填好，都傳一次
+            if not first_run or manual:
+                send(item, "（今日）")
+                print("已通知今日聯絡簿：", item["title"])
+                today_sent = True
             continue
-        if not item["text"] and not item["image"]:
-            continue  # 老師先建的空白卡片，等有內容再通知
-        label = "更新" if key in state else "新貼文"
+
+        if first_run or posts.get(key) == h or not has_content:
+            continue  # 沒變動，或是老師先建的空白卡片
+        label = "更新" if key in posts else "新貼文"
         send(item, label)
         print("已通知：", label, item["title"])
 
+    new_state = {"posts": new_posts}
+    if today_sent:
+        new_state["done"] = today.isoformat()
+    elif state.get("done"):
+        new_state["done"] = state["done"]
     if new_state != state:
         with open(STATE_FILE, "w", encoding="utf-8") as f:
             json.dump(new_state, f, indent=0, sort_keys=True)
