@@ -77,10 +77,23 @@ def digest(item):
     return hashlib.sha256((item["title"] + "\n" + item["text"] + "\n" + item["image"]).encode()).hexdigest()
 
 
+DATE_RE = re.compile(r"(?<!\d)(\d{1,2})\s*(?:[/／.\-]|月)\s*(\d{1,2})(?!\d)")
+
+
+def card_date(item):
+    """從標題找日期（例如 10/19、10／19、10.19、10月19日、115/10/19），
+    標題沒有日期時改看內文第一行。回傳 (月, 日) 或 None。"""
+    first_line = item["text"].split("\n", 1)[0]
+    for s in (item["title"], first_line):
+        for m in DATE_RE.finditer(s):
+            month, day = int(m.group(1)), int(m.group(2))
+            if 1 <= month <= 12 and 1 <= day <= 31:
+                return month, day
+    return None
+
+
 def is_today_card(item, today):
-    """標題是今天日期，例如 10/19、10／19。"""
-    m = re.match(r"\s*0?(\d{1,2})\s*[/／]\s*0?(\d{1,2})(?!\d)", item["title"])
-    return bool(m) and (int(m.group(1)), int(m.group(2))) == (today.month, today.day)
+    return card_date(item) == (today.month, today.day)
 
 
 def send(item, label):
@@ -119,6 +132,10 @@ def main():
             return
 
     items = load_items(os.environ["FEED_URL"])
+    # 除錯用：只印日期，不印內容
+    dates = sorted({d for d in map(card_date, items) if d})
+    print(f"共 {len(items)} 篇，有日期的卡片 {len(dates)} 篇，"
+          f"最近日期：{'%d/%d' % dates[-1] if dates else '無'}，今天：{today.month}/{today.day}")
 
     if "--test" in sys.argv:
         send(items[-1], "（測試）")
