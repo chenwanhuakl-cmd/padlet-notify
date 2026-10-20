@@ -3,17 +3,24 @@ name: 今日降雨提醒
 on:
   schedule:
     # GitHub 用 UTC 時間（台灣時間 -8 小時）
-    # 台灣時間每天 06:30 啟動（GitHub 排程常延遲，提早啟動），程式等到 07:05 才發
-    # 假日由程式依行事曆跳過（補班日照發）
-    - cron: "30 22 * * *"
+    # 台灣時間 05:50、06:15、06:40 各啟動一次當備援（GitHub 排程常延遲、偶爾整個跳過）
+    # 第一個啟動的等到 07:05 發，其他的看到今天已發就結束；假日由程式依行事曆跳過（補班日照發）
+    - cron: "50 21 * * *"
+    - cron: "15 22 * * *"
+    - cron: "40 22 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+# 同一時間只跑一個，後面啟動的會排隊，等前一個發完、存好紀錄才開始
 concurrency: weather
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # 05:50 啟動的要等 75 分鐘到 07:05，所以給 120 分鐘
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,3 +32,9 @@ jobs:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: python weather.py ${{ github.event_name == 'workflow_dispatch' && '--now' || '' }}
+      - name: Save state
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add weather_state.json 2>/dev/null || exit 0
+          git diff --cached --quiet || (git commit -m "update weather state" && git pull --rebase && git push)
