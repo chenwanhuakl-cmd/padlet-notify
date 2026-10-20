@@ -7,6 +7,9 @@ on:
     # 週六只有遇到補班日才會真的檢查，其他假日由程式依行事曆跳過
     - cron: "50 4 * * 1-6"
     - cron: "*/10 5-13 * * 1-6"
+  # 外部排程（cron-job.org）準時觸發用；GitHub 自己的排程常延遲或被跳過
+  repository_dispatch:
+    types: [check]
   workflow_dispatch:
     inputs:
       test:
