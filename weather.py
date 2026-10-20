@@ -5,7 +5,8 @@
   - 沒有設定或抓取失敗 → Open-Meteo（不需授權碼，逐小時降雨機率）
 
 只在上班日發（依台灣政府行事曆，含補班日，跟電子聯絡簿用同一套判斷）。
-GitHub 排程常會延遲，所以排在 06:30 啟動，程式等到 07:05 才發；
+GitHub 排程常會延遲、偶爾整個跳過，所以排了三次啟動（05:50、06:15、06:40），
+第一個啟動的等到 07:05 發，發完記在 weather_state.json，後面的看到今天已發就結束；
 如果啟動時已經超過 07:05，就馬上發。
 
 環境變數：
@@ -26,6 +27,7 @@ import urllib.request
 
 from check import is_school_day
 
+STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "weather_state.json")
 TW = datetime.timezone(datetime.timedelta(hours=8))
 SEND_AT = datetime.time(7, 5)
 FROM_HOUR, TO_HOUR = 6, 19
@@ -142,6 +144,10 @@ def main():
     if "--now" not in sys.argv and not is_school_day(today):
         print("今天放假，不發降雨提醒")
         return
+    if "--now" not in sys.argv and os.path.exists(STATE_FILE):
+        if json.load(open(STATE_FILE, encoding="utf-8")).get("sent") == today.isoformat():
+            print("今天的降雨提醒已經發過了")
+            return
 
     slots, source = None, ""
     if os.environ.get("CWA_KEY"):
@@ -163,6 +169,9 @@ def main():
         time.sleep(wait)
     send(msg)
     print("已傳送")
+    if "--now" not in sys.argv:
+        with open(STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump({"sent": today.isoformat()}, f)
 
 
 if __name__ == "__main__":
