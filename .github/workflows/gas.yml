@@ -1,0 +1,40 @@
+name: 檢查瓦斯費帳單
+
+on:
+  schedule:
+    # GitHub 用 UTC 時間（台灣時間 -8 小時）
+    # 每天台灣時間 09:00 跑一次；距上期抄表不到 50 天時程式會直接跳過
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "把目前這期帳單傳出去做測試"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency: gas
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check gas bill
+        env:
+          GAS_URL: ${{ secrets.GAS_URL }}
+          GAS_PHONE: ${{ secrets.GAS_PHONE }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: python gas.py ${{ inputs.test && '--test' || '' }} ${{ github.event_name == 'workflow_dispatch' && '--manual' || '' }}
+      - name: Save state
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add gas_state.json
+          git diff --cached --quiet || (git commit -m "update gas state" && git pull --rebase && git push)
