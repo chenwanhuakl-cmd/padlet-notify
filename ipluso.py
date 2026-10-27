@@ -24,6 +24,7 @@ import datetime
 import hashlib
 import json
 import os
+import re
 import sys
 import urllib.parse
 import urllib.request
@@ -37,9 +38,14 @@ BIWEEKLY_ANCHOR = datetime.date(2026, 11, 1)  # 雙週報告的基準星期日�
 
 def fetch_api(url, cookie):
     """呼叫 ipluso API，回傳 data 欄位"""
+    # ipluso 網站是用 X-SESSION 標頭驗證登入，值就是 Cookie 裡的 sess；
+    # IPLUSO_COOKIE 可以放整串 Cookie，也可以只放 sess 的值
+    m = re.search(r"(?:^|;\s*)sess=([^;]+)", cookie)
+    sess = urllib.parse.unquote(m.group(1)) if m else cookie.strip()
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Cookie": cookie
+        "Cookie": cookie,
+        "X-SESSION": sess,
     }
     try:
         req = urllib.request.Request(url, headers=headers)
