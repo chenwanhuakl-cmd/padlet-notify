@@ -5,6 +5,15 @@ on:
     # 台灣時間每日 18:00 執行（UTC 時間 10:00）
     - cron: "0 10 * * *"
   workflow_dispatch:
+    inputs:
+      range_start:
+        description: "測試用：統計起日（例如 2026-10-01，留空 = 一般執行）"
+        required: false
+        default: ""
+      range_end:
+        description: "測試用：統計迄日（例如 2026-10-14）"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -28,7 +37,7 @@ jobs:
           IPLUSO_COOKIE: ${{ secrets.IPLUSO_COOKIE }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-        run: python ipluso.py
+        run: python ipluso.py ${{ inputs.range_start && format('--range {0} {1}', inputs.range_start, inputs.range_end) || '' }}
 
       - name: Save state
         if: always()
