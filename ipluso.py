@@ -18,6 +18,7 @@
 參數：
   --test           同時發送「本月到今天為止」的消費統計（測試用）
   --dry            本機測試：僅印出訊息，不傳送 Telegram
+  --range 起 迄     只發送指定區間的消費統計，例如 --range 2026-10-01 2026-10-14
 """
 
 import datetime
@@ -223,6 +224,13 @@ def main():
     notice_msg = build_pickup_notice(records)
     if notice_msg:
         output(notice_msg)
+
+    # 手動指定統計區間（測試用）：--range 2026-10-01 2026-10-14
+    if "--range" in sys.argv:
+        i = sys.argv.index("--range")
+        start, end = (datetime.date.fromisoformat(s) for s in sys.argv[i + 1:i + 3])
+        output(build_biweekly_report(sum_paid(state, start, end), start, end))
+        return
 
     # (B) 每月 1 號：結算上個月（月底最後一晚 19:20 取貨付的錢，要隔天才算得到）
     if today.day == 1 or is_test:
