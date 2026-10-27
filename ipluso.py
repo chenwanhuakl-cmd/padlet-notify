@@ -3,8 +3,11 @@
 功能說明：
   1. 每日取貨提醒（每天 18:00）：監控 UNPAID 且 ARRIVED 的訂單，提示 19:20 順路取貨。
   2. 每兩週進度統計（每兩週的星期日）：統計最近兩週已付款 (PAID) 的團購金額。
-  3. 月底總結算（當月最後一天）：統計當月所有 PAID 訂單，依 shipping_serial_id 去重，
+  3. 月結算（每月 1 號）：統計上個月所有 PAID 訂單，依 shipping_serial_id 去重，
      比對每月 $2,500 吃吃喝喝團購預算。
+
+  訂單列表沒有日期，所以新的已付款訂單會再查一次明細的 shipping_payment_time，
+  記在 ipluso_state.json（只存雜湊值、金額與付款日），之後不再重查。
 
 環境變數：
   IPLUSO_URL       ipluso API 網址或短網址
@@ -13,11 +16,12 @@
   TG_CHAT_ID       你的 Telegram chat id
 
 參數：
-  --test           直接測試發送「今日取貨提醒」與「本月消費統計」
+  --test           同時發送「本月到今天為止」的消費統計（測試用）
   --dry            本機測試：僅印出訊息，不傳送 Telegram
 """
 
 import datetime
+import hashlib
 import json
 import os
 import sys
@@ -26,26 +30,26 @@ import urllib.request
 
 TW = datetime.timezone(datetime.timedelta(hours=8))
 GROUP_BUDGET = 2500  # 每月團購吃吃喝喝估算預算
+STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ipluso_state.json")
+DETAIL_URL = "https://www.iplusonego.com/api/index.php/shippings/buyer_shipping_detail/{serial_id}"
+BIWEEKLY_ANCHOR = datetime.date(2026, 11, 1)  # 雙週報告的基準星期日，之後每 14 天一次
 
 
 def fetch_api(url, cookie):
-    """呼叫 ipluso API 抓取買家出貨與訂單紀錄"""
+    """呼叫 ipluso API，回傳 data 欄位"""
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Cookie": cookie
     }
-    req = urllib.request.Request(url, headers=headers)
     try:
+        req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=30) as response:
             res = json.loads(response.read().decode("utf-8"))
-            if res.get("code") == 200:
-                return res.get("data", {}).get("records", [])
-            else:
-                print(f"API 回傳錯誤代碼：{res.get('code')}")
-                return []
     except Exception as e:
-        print(f"呼叫 ipluso API 失敗：{e}")
-        return []
+        raise RuntimeError(f"呼叫 ipluso API 失敗：{e}")
+    if res.get("code") != 200:
+        raise RuntimeError(f"API 回傳錯誤代碼：{res.get('code')}（Cookie 可能過期，請重新登入後更新 IPLUSO_COOKIE）")
+    return res.get("data") or {}
 
 
 def send_telegram(msg):
@@ -101,56 +105,78 @@ def build_pickup_notice(records):
 
 
 # ----------------------------------------------------------------------
-# 2. 雙週進度與當月結算統計 (PAID 訂單去重統計)
+# 2. 雙週進度與當月結算統計（付款日記在 ipluso_state.json）
 # ----------------------------------------------------------------------
-def calculate_paid_spending(records):
-    """精準統計已付款 (PAID) 訂單，採用 shipping_serial_id 去重"""
-    paid_orders = {}
+def load_state():
+    if not os.path.exists(STATE_FILE):
+        return None
+    with open(STATE_FILE, encoding="utf-8") as f:
+        return json.load(f)
 
+
+def payment_date(serial_id, cookie, fallback):
+    """查訂單明細的付款時間（API 用 UTC），換成台灣日期；查不到就用 fallback"""
+    detail = fetch_api(DETAIL_URL.format(serial_id=serial_id), cookie)
+    t = detail.get("shipping_payment_time")
+    try:
+        utc = datetime.datetime.strptime(t, "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc)
+        return utc.astimezone(TW).date()
+    except (TypeError, ValueError):
+        print(f"訂單沒有付款時間（{t!r}），改用 {fallback}")
+        return fallback
+
+
+def update_paid(records, state, cookie, fallback):
+    """把新變成 PAID 的訂單記上付款日（以 shipping_serial_id 去重，每筆只查一次明細）"""
+    paid = dict((state or {}).get("paid", {}))
     for order in records:
-        if order.get("shipping_payment_status") == "PAID":
-            serial_id = order.get("shipping_serial_id")
-            price = int(float(order.get("shipping_total_price", 0)))
-            items = [item.get("product_title") for item in order.get("shipping_product_items", [])]
-
-            paid_orders[serial_id] = {
-                "price": price,
-                "items": items
-            }
-
-    total_spent = sum(o["price"] for o in paid_orders.values())
-    return total_spent, paid_orders
+        if order.get("shipping_payment_status") != "PAID":
+            continue
+        serial_id = str(order.get("shipping_serial_id"))
+        # 只存雜湊值，不存訂單編號
+        key = hashlib.sha256(serial_id.encode()).hexdigest()[:16]
+        if key not in paid:
+            price = int(float(order.get("shipping_total_price") or 0))
+            paid[key] = {"price": price, "date": payment_date(serial_id, cookie, fallback).isoformat()}
+    return {"paid": paid}
 
 
-def build_biweekly_report(total_spent, today):
-    """產生每兩週報告"""
+def sum_paid(state, start, end):
+    """統計付款日介於 start ～ end（含）的金額"""
+    total = 0
+    for o in state["paid"].values():
+        if o["date"] and start.isoformat() <= o["date"] <= end.isoformat():
+            total += o["price"]
+    return total
+
+
+def build_biweekly_report(total_spent, start, end):
+    """產生雙週報告"""
     lines = [
-        f"📊 【團購吃吃喝喝・雙週消費進度】",
-        f"📅 統計日期：{today.month}/{today.day}",
-        "───────────────",
-        f"💵 累計已花費：${total_spent:,} 元",
-        f"🎯 月預算額度：${GROUP_BUDGET:,} 元",
-        f"💡 剩餘額度：${GROUP_BUDGET - total_spent:,} 元"
+        "🛒 【雙週團購消費快報】",
+        f"⏱ 統計區間：{start:%m/%d} ～ {end:%m/%d}",
+        f"💵 雙週已消費：${total_spent:,} 元",
     ]
+    if total_spent <= GROUP_BUDGET / 2:
+        lines.append("💡 狀態：進度良好，繼續保持！")
+    else:
+        lines.append(f"💡 狀態：已超過半個月預算 ${GROUP_BUDGET // 2:,} 元，要踩一下煞車囉！")
     return "\n".join(lines)
 
 
-def build_month_end_report(total_spent, today):
-    """產生當月最後一天總結算報告"""
+def build_month_end_report(total_spent, start, end):
+    """產生月結算報告"""
     diff = GROUP_BUDGET - total_spent
     lines = [
-        f"🎯 【ipluso 團購 {today.month} 月份總結算報告】",
-        f"📅 結算區間：{today.month} 月全月",
-        "───────────────",
+        f"🎯 【{start.month} 月團購總結算報告】",
+        f"📅 結算區間：{start:%m/%d} ～ {end:%m/%d}",
         f"💵 本月實際總花費：${total_spent:,} 元",
-        f"📊 估算預算額度：${GROUP_BUDGET:,} 元"
+        f"📊 設定預算額度：${GROUP_BUDGET:,} 元",
     ]
-
     if diff >= 0:
-        lines.append(f"✅ 控管良好！本月團購還賸餘 ${diff:,} 元。")
+        lines.append(f"✅ 本月結語：控制在預算內！還剩 ${diff:,} 元。")
     else:
-        lines.append(f"⚠️ 本月團購超支 ${abs(diff):,} 元（將從私房錢/好市多預算微調）。")
-
+        lines.append(f"⚠️ 本月結語：超支 ${-diff:,} 元。")
     return "\n".join(lines)
 
 
@@ -158,70 +184,50 @@ def build_month_end_report(total_spent, today):
 # 主程式 logic
 # ----------------------------------------------------------------------
 def main():
-    now = datetime.datetime.now(TW)
-    today = now.date()
-    
+    today = datetime.datetime.now(TW).date()
+    yesterday = today - datetime.timedelta(days=1)
+
     is_test = "--test" in sys.argv
     is_dry = "--dry" in sys.argv
 
+    def output(msg):
+        print(msg)
+        if not is_dry:
+            send_telegram(msg)
+
     # 1. 抓取 API 資料
-    api_url = os.environ.get("IPLUSO_URL", "https://www.iplusonego.com/api/index.php/shippings/buyer_shipping_records?seller=916912472133&time_filter=recent")
+    # GitHub 沒設定的 Secret 會是空字串，所以用 or 帶入預設值
+    api_url = os.environ.get("IPLUSO_URL") or "https://www.iplusonego.com/api/index.php/shippings/buyer_shipping_records?seller=916912472133&time_filter=recent"
     cookie = os.environ.get("IPLUSO_COOKIE", "")
 
-    records = fetch_api(api_url, cookie)
-    print(f"成功抓取到 {len(records)} 筆紀錄")
+    old_state = load_state()
+    try:
+        records = fetch_api(api_url, cookie).get("records") or []
+        print(f"成功抓取到 {len(records)} 筆紀錄")
+        # 2. 更新付款紀錄（新的已付款訂單去查明細的付款時間）
+        state = update_paid(records, old_state, cookie, today)
+    except RuntimeError as e:
+        output(f"⚠️ ipluso 團購監控失敗\n{e}")
+        sys.exit(1)
+    if state != old_state and not is_dry:
+        with open(STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=0, sort_keys=True)
 
-    # 2. 測試模式直接印出所有報告
-    if is_test:
-        print("=== 執行測試模式 ===")
-        notice = build_pickup_notice(records)
-        if notice:
-            print("[取貨提醒]\n", notice)
-            if not is_dry:
-                send_telegram(notice)
-
-        total_spent, _ = calculate_paid_spending(records)
-        month_report = build_month_end_report(total_spent, today)
-        print("\n[月底結算報告]\n", month_report)
-        if not is_dry:
-            send_telegram(month_report)
-        return
-
-    # 3. 正常排程邏輯判斷：
-    
     # (A) 每日取貨提醒（有未付款到貨才發）
     notice_msg = build_pickup_notice(records)
     if notice_msg:
-        print("觸發每日取貨提醒")
-        if is_dry:
-            print(notice_msg)
-        else:
-            send_telegram(notice_msg)
+        output(notice_msg)
 
-    # (B) 判斷是否為「當月最後一天」
-    tomorrow = today + datetime.timedelta(days=1)
-    is_month_end = (tomorrow.day == 1)
+    # (B) 每月 1 號：結算上個月（月底最後一晚 19:20 取貨付的錢，要隔天才算得到）
+    if today.day == 1 or is_test:
+        end = yesterday if today.day == 1 else today
+        start = end.replace(day=1)
+        output(build_month_end_report(sum_paid(state, start, end), start, end))
 
-    # (C) 判斷是否為「每兩週的星期日」（利用 ISO 週別奇偶數）
-    is_biweekly_sunday = (today.weekday() == 6) and (today.isocalendar()[1] % 2 == 0)
-
-    total_spent, _ = calculate_paid_spending(records)
-
-    if is_month_end:
-        print("觸發當月最後一天結算")
-        msg = build_month_end_report(total_spent, today)
-        if is_dry:
-            print(msg)
-        else:
-            send_telegram(msg)
-
-    elif is_biweekly_sunday:
-        print("觸發雙週進度檢視")
-        msg = build_biweekly_report(total_spent, today)
-        if is_dry:
-            print(msg)
-        else:
-            send_telegram(msg)
+    # (C) 每兩週的星期日：統計最近 14 天
+    elif (today - BIWEEKLY_ANCHOR).days % 14 == 0:
+        start = today - datetime.timedelta(days=14)
+        output(build_biweekly_report(sum_paid(state, start, yesterday), start, yesterday))
 
 
 if __name__ == "__main__":
