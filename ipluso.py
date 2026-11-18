@@ -10,7 +10,8 @@
   記在 ipluso_state.json（只存雜湊值、金額與付款日），之後不再重查。
 
 個人支出：傳「-280」給 Telegram bot，這 280 元就不算進家用預算（傳「+280」可加回）。
-  每天 18:00 執行時才會讀取，日期以傳訊息那天為準。
+  每天 08:00、18:00 執行時讀取，日期預設是傳訊息那天；
+  事後補登就在金額後面加月/日，例如「-280 11/14」（只能補過去的日期）。
 
 環境變數：
   IPLUSO_URL       ipluso API 網址或短網址
@@ -151,10 +152,22 @@ def update_paid(records, state, cookie, fallback):
     return {"paid": paid}
 
 
+def resolve_date(month, day, today):
+    """把訊息裡補登的「11/14」換成完整日期，比今天晚就當成去年的；看不懂回傳 None"""
+    for year in (today.year, today.year - 1):
+        try:
+            d = datetime.date(year, month, day)
+        except ValueError:
+            return None
+        if d <= today:
+            return d
+    return None
+
+
 def read_personal(state):
     """讀取傳給 Telegram bot 的「-金額」訊息，記為個人支出（不列入家用預算）。
-    -280 = 這筆 280 是個人的；+280 = 記錯了，加回去。日期以傳訊息的那天為準。
-    回傳要回覆給使用者的確認訊息。"""
+    -280 = 這筆 280 是個人的；+280 = 記錯了，加回去。日期預設是傳訊息的那天，
+    也可以補登過去的日期，例如「-280 11/14」。回傳要回覆給使用者的確認訊息。"""
     personal = list(state.get("personal", []))
     offset = state.get("tg_offset", 0)
     url = f"https://api.telegram.org/bot{os.environ['TG_BOT_TOKEN']}/getUpdates?offset={offset}"
@@ -166,11 +179,18 @@ def read_personal(state):
         msg = u.get("message") or {}
         if str(msg.get("chat", {}).get("id")) != os.environ["TG_CHAT_ID"]:
             continue
-        m = re.match(r"\s*([+-])\s*\$?\s*(\d+)", msg.get("text", ""))
+        # 「-280」或補登日期的「-280 11/14」
+        m = re.match(r"\s*([+-])\s*\$?\s*(\d+)(?:\s+(\d{1,2})\s*[/-]\s*(\d{1,2}))?", msg.get("text", ""))
         if not m:
             continue
         amount = int(m.group(2)) * (1 if m.group(1) == "-" else -1)
         day = datetime.datetime.fromtimestamp(msg["date"], TW).date()
+        if m.group(3):
+            backdated = resolve_date(int(m.group(3)), int(m.group(4)), day)
+            if backdated is None:
+                replies.append(f"⚠️ 看不懂日期「{m.group(3)}/{m.group(4)}」，這筆沒有記錄")
+                continue
+            day = backdated
         # 只存日期和金額，不存訊息內容
         personal.append({"date": day.isoformat(), "amount": amount})
         action = "扣除個人支出" if amount > 0 else "加回家用支出"
