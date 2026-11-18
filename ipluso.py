@@ -9,6 +9,9 @@
   訂單列表沒有日期，所以新的已付款訂單會再查一次明細的 shipping_payment_time，
   記在 ipluso_state.json（只存雜湊值、金額與付款日），之後不再重查。
 
+個人支出：傳「-280」給 Telegram bot，這 280 元就不算進家用預算（傳「+280」可加回）。
+  每天 18:00 執行時才會讀取，日期以傳訊息那天為準。
+
 環境變數：
   IPLUSO_URL       ipluso API 網址或短網址
   IPLUSO_COOKIE    ipluso 登入後的 Cookie 憑證
@@ -148,22 +151,54 @@ def update_paid(records, state, cookie, fallback):
     return {"paid": paid}
 
 
+def read_personal(state):
+    """讀取傳給 Telegram bot 的「-金額」訊息，記為個人支出（不列入家用預算）。
+    -280 = 這筆 280 是個人的；+280 = 記錯了，加回去。日期以傳訊息的那天為準。
+    回傳要回覆給使用者的確認訊息。"""
+    personal = list(state.get("personal", []))
+    offset = state.get("tg_offset", 0)
+    url = f"https://api.telegram.org/bot{os.environ['TG_BOT_TOKEN']}/getUpdates?offset={offset}"
+    with urllib.request.urlopen(url, timeout=30) as r:
+        updates = json.loads(r.read().decode("utf-8")).get("result", [])
+    replies = []
+    for u in updates:
+        offset = u["update_id"] + 1
+        msg = u.get("message") or {}
+        if str(msg.get("chat", {}).get("id")) != os.environ["TG_CHAT_ID"]:
+            continue
+        m = re.match(r"\s*([+-])\s*\$?\s*(\d+)", msg.get("text", ""))
+        if not m:
+            continue
+        amount = int(m.group(2)) * (1 if m.group(1) == "-" else -1)
+        day = datetime.datetime.fromtimestamp(msg["date"], TW).date()
+        # 只存日期和金額，不存訊息內容
+        personal.append({"date": day.isoformat(), "amount": amount})
+        action = "扣除個人支出" if amount > 0 else "加回家用支出"
+        replies.append(f"{day:%m/%d} {action} ${abs(amount):,} 元")
+    state["personal"] = personal
+    state["tg_offset"] = offset
+    return replies
+
+
 def sum_paid(state, start, end):
-    """統計付款日介於 start ～ end（含）的金額"""
-    total = 0
-    for o in state["paid"].values():
-        if o["date"] and start.isoformat() <= o["date"] <= end.isoformat():
-            total += o["price"]
-    return total
+    """統計付款日介於 start ～ end（含）的金額，回傳 (家用金額, 已扣除的個人金額)"""
+    def in_range(d):
+        return d and start.isoformat() <= d <= end.isoformat()
+    total = sum(o["price"] for o in state["paid"].values() if in_range(o["date"]))
+    personal = sum(p["amount"] for p in state.get("personal", []) if in_range(p["date"]))
+    return total - personal, personal
 
 
-def build_biweekly_report(total_spent, start, end):
+def build_biweekly_report(spent, start, end):
     """產生雙週報告"""
+    total_spent, personal = spent
     lines = [
         "🛒 【雙週團購消費快報】",
         f"⏱ 統計區間：{start:%m/%d} ～ {end:%m/%d}",
         f"💵 雙週已消費：${total_spent:,} 元",
     ]
+    if personal:
+        lines.append(f"🙋 已扣除個人支出：${personal:,} 元")
     if total_spent <= GROUP_BUDGET / 2:
         lines.append("💡 狀態：進度良好，繼續保持！")
     else:
@@ -171,8 +206,9 @@ def build_biweekly_report(total_spent, start, end):
     return "\n".join(lines)
 
 
-def build_month_end_report(total_spent, start, end):
+def build_month_end_report(spent, start, end):
     """產生月結算報告"""
+    total_spent, personal = spent
     diff = GROUP_BUDGET - total_spent
     lines = [
         f"🎯 【{start.month} 月團購總結算報告】",
@@ -180,6 +216,8 @@ def build_month_end_report(total_spent, start, end):
         f"💵 本月實際總花費：${total_spent:,} 元",
         f"📊 設定預算額度：${GROUP_BUDGET:,} 元",
     ]
+    if personal:
+        lines.insert(3, f"🙋 已扣除個人支出：${personal:,} 元")
     if diff >= 0:
         lines.append(f"✅ 本月結語：控制在預算內！還剩 ${diff:,} 元。")
     else:
@@ -208,22 +246,33 @@ def main():
     cookie = os.environ.get("IPLUSO_COOKIE", "")
 
     old_state = load_state()
+    # --personal-only：早上加跑一次，只讀個人支出訊息
+    # （Telegram 只保留 24 小時內的訊息，一天只讀一次可能會漏）
+    personal_only = "--personal-only" in sys.argv
+    if personal_only:
+        state = dict(old_state or {"paid": {}})
+    else:
+        try:
+            records = fetch_api(api_url, cookie).get("records") or []
+            print(f"成功抓取到 {len(records)} 筆紀錄")
+            # 2. 更新付款紀錄（新的已付款訂單去查明細的付款時間）
+            state = update_paid(records, old_state, cookie, today)
+        except RuntimeError as e:
+            output(f"⚠️ ipluso 團購監控失敗\n{e}")
+            sys.exit(1)
+        state.update({k: old_state[k] for k in ("personal", "tg_offset") if old_state and k in old_state})
     try:
-        records = fetch_api(api_url, cookie).get("records") or []
-        print(f"成功抓取到 {len(records)} 筆紀錄")
-        # 2. 更新付款紀錄（新的已付款訂單去查明細的付款時間）
-        state = update_paid(records, old_state, cookie, today)
-    except RuntimeError as e:
-        output(f"⚠️ ipluso 團購監控失敗\n{e}")
-        sys.exit(1)
+        replies = read_personal(state)
+    except Exception as e:
+        print("讀取 Telegram 訊息失敗：", e)
+        replies = []
+    if replies:
+        output("📝 已記錄個人支出（不列入團購預算）\n" + "\n".join(replies))
     if state != old_state and not is_dry:
         with open(STATE_FILE, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=0, sort_keys=True)
-
-    # (A) 每日取貨提醒（有未付款到貨才發）
-    notice_msg = build_pickup_notice(records)
-    if notice_msg:
-        output(notice_msg)
+    if personal_only:
+        return
 
     # 手動指定統計區間（測試用）：--range 2026-10-01 2026-10-14
     if "--range" in sys.argv:
@@ -231,6 +280,11 @@ def main():
         start, end = (datetime.date.fromisoformat(s) for s in sys.argv[i + 1:i + 3])
         output(build_biweekly_report(sum_paid(state, start, end), start, end))
         return
+
+    # (A) 每日取貨提醒（有未付款到貨才發）
+    notice_msg = build_pickup_notice(records)
+    if notice_msg:
+        output(notice_msg)
 
     # (B) 每月 1 號：結算上個月（月底最後一晚 19:20 取貨付的錢，要隔天才算得到）
     if today.day == 1 or is_test:
