@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2E6FB7">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+<title>喬登練習卷</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap">
+<style>
+  /* 版面：一題佔滿一個畫面。上面進度，中間題目（圖或字），下面大選項。 */
+  :root {
+    --bg: #F1F5FA;
+    --surface: #FFFFFF;
+    --ink: #17222E;
+    --muted: #5C6B7A;
+    --line: #D5E0EC;
+    --accent: #2E6FB7;
+    --accent-soft: #DCE9F8;
+    --sun: #F2A91B;
+    --coral: #E4654A;
+    --good: #2E9E5B;
+    --shadow: 0 10px 24px rgba(23,34,46,.10);
+    --font-display: "Fredoka", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+    --font-body: "Nunito", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101820; --surface: #1A242E; --ink: #E8EFF6; --muted: #9AAABA;
+      --line: #2A3744; --accent: #6FB0F0; --accent-soft: #1D3147;
+      --sun: #F7C560; --coral: #FF8468; --good: #4FD17F;
+      --shadow: 0 10px 24px rgba(0,0,0,.45); color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101820; --surface: #1A242E; --ink: #E8EFF6; --muted: #9AAABA;
+    --line: #2A3744; --accent: #6FB0F0; --accent-soft: #1D3147;
+    --sun: #F7C560; --coral: #FF8468; --good: #4FD17F;
+    --shadow: 0 10px 24px rgba(0,0,0,.45); color-scheme: dark;
+  }
+
+  html, body { height: 100%; }
+  :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; -webkit-tap-highlight-color: transparent; }
+  * { box-sizing: border-box; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--sun); outline-offset: 3px; }
+
+  #app {
+    min-height: 100%; display: flex; flex-direction: column; gap: 12px;
+    padding-block: 12px 18px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    max-width: 720px; margin: 0 auto;
+  }
+
+  .bar { display: flex; align-items: center; gap: 10px; }
+  .bar h1 { font-family: var(--font-display); font-size: 20px; margin: 0; flex: 1; min-width: 0; }
+  .icon-btn { border: 2px solid var(--line); background: var(--surface); border-radius: 999px; width: 40px; height: 40px; display: grid; place-items: center; font-size: 17px; flex: none; }
+
+  .progress { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 2px solid var(--line); border-radius: 14px; padding: 8px 12px; }
+  .pbar { flex: 1; min-width: 0; height: 10px; border-radius: 999px; background: var(--accent-soft); overflow: hidden; }
+  .pbar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s; }
+  .pnum { font-size: 13px; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .stage { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+
+  /* 題目卡 */
+  .qcard { background: var(--surface); border: 3px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); padding: 16px; display: flex; flex-direction: column; gap: 8px; align-items: center; min-height: 190px; justify-content: center; }
+  .qtag { font-size: 12.5px; font-weight: 800; letter-spacing: .06em; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 3px 11px; }
+  .qpic { max-height: 30vh; width: auto; object-fit: contain; border-radius: 10px; }
+  .qword { font-family: var(--font-display); font-size: clamp(40px, 13vw, 78px); font-weight: 600; letter-spacing: .04em; line-height: 1.1; text-align: center; word-break: break-word; }
+  .qblank { color: var(--coral); }
+  .qear { font-size: clamp(56px, 18vw, 96px); line-height: 1; }
+  .qhint { font-size: 15px; color: var(--muted); text-align: center; }
+
+  /* 選項 */
+  .choices { display: grid; gap: 10px; }
+  .choices.c2 { grid-template-columns: 1fr 1fr; }
+  .choices.c3 { grid-template-columns: repeat(3, 1fr); }
+  .choices.c4 { grid-template-columns: repeat(2, 1fr); }
+  .choice {
+    border: 3px solid var(--line); background: var(--surface); border-radius: 18px;
+    padding: 14px 8px; min-height: 68px;
+    font-family: var(--font-display); font-size: clamp(22px, 6.5vw, 34px); font-weight: 600;
+    display: grid; place-items: center; box-shadow: var(--shadow); transition: transform .12s;
+    word-break: break-word; overflow: hidden;
+  }
+  .choice.pic { padding: 8px; aspect-ratio: 1; }
+  .choice.pic img { width: 100%; height: 100%; object-fit: contain; }
+  .choice:active { transform: scale(.96); }
+  .choice.right { border-color: var(--good); background: color-mix(in srgb, var(--good) 14%, var(--surface)); color: var(--good); }
+  .choice.wrong { border-color: var(--coral); opacity: .5; }
+
+  .feedback { font-family: var(--font-display); font-size: clamp(19px, 5.4vw, 26px); font-weight: 600; text-align: center; min-height: 1.4em; }
+  .feedback.good { color: var(--good); }
+  .feedback.oops { color: var(--coral); }
+
+  .actions { display: flex; gap: 8px; }
+  .actions button { flex: 1; min-width: 0; border-radius: 16px; border: 3px solid var(--line); background: var(--surface); padding: 12px 6px; font-weight: 800; font-size: 16px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .b-sub { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .b-listen { border-color: var(--sun); }
+  .b-go { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+  /* 清單 */
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .sheet-card { width: 100%; text-align: left; border: 3px solid var(--line); background: var(--surface); border-radius: 18px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow); }
+  .sheet-card .em { font-size: 28px; flex: none; }
+  .sheet-card .mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .sheet-card .t { font-family: var(--font-display); font-size: 19px; font-weight: 600; }
+  .sheet-card .m { font-size: 13px; color: var(--muted); }
+  .sheet-card .score { font-size: 13px; font-weight: 800; color: var(--good); flex: none; }
+  .empty-note { background: var(--surface); border: 2px dashed var(--line); border-radius: 18px; padding: 18px; }
+  .empty-note h2 { font-family: var(--font-display); font-size: 19px; margin: 0 0 8px; }
+  .note { font-size: 13.5px; color: var(--muted); line-height: 1.7; margin: 0; }
+  code { background: var(--accent-soft); border-radius: 5px; padding: 1px 5px; font-size: .92em; }
+
+  /* 完成 */
+  .done { text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .done .em { font-size: clamp(66px, 22vw, 116px); animation: pop .6s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes pop { from { transform: scale(.3) rotate(-14deg); } }
+  .done h2 { font-family: var(--font-display); font-size: clamp(25px, 7.5vw, 40px); margin: 0; color: var(--accent); text-wrap: balance; }
+  .chiplist { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  .chip { border-radius: 999px; padding: 4px 11px; font-size: 14px; font-weight: 700; background: color-mix(in srgb, var(--coral) 16%, transparent); color: var(--coral); }
+  .report { width: 100%; min-height: 86px; border: 2px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); padding: 10px 12px; font: inherit; font-size: 14px; line-height: 1.6; resize: vertical; }
+  .mini { border: 2px solid var(--line); background: var(--surface); border-radius: 12px; padding: 9px 14px; font-weight: 700; font-size: 15px; }
+  .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 15px; z-index: 9; max-width: 86vw; text-align: center; }
+  @media (prefers-reduced-motion: reduce) { .choice, .pbar i { transition: none; } .done .em { animation: none; } }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="bar">
+    <h1 id="title">喬登練習卷</h1>
+    <button class="icon-btn" id="btnSpeak" title="再念一次">🔊</button>
+    <button class="icon-btn" id="btnHome" title="回到清單">📋</button>
+  </div>
+  <div class="progress" id="progress" hidden>
+    <span class="pnum" id="pnum">1 / 1</span>
+    <div class="pbar"><i id="pfill" style="width:0%"></i></div>
+  </div>
+  <div class="stage" id="stage"></div>
+</div>
+
+<script>
+/* ==========================================================================
+   喬登練習卷 —— 題目由 Claude 看完考卷後產生，放在 quizzes/ 資料夾
+   題型（ask = 題目怎麼出，opt = 選項長什麼樣）：
+     ask "listen" 只播英文，讓他選        ask "pic"   看圖片選
+     ask "word"   看英文字選              ask "blank" 看挖空的字，選缺的字母
+     opt "text"   選項是英文字            opt "pic"   選項是圖片
+     opt "letter" 選項是字母
+   圖片自動抓 ../flashcards/img/<單字小寫>.jpg
+   ========================================================================== */
+
+const STORE_KEY = 'jordan-practice-v1';
+const IMG_BASE = '../flashcards/img/';
+
+let store = { results: {} };
+try { store = { results: {}, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') }; } catch (e) {}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {} }
+
+const slug = w => String(w).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+const imgOf = w => IMG_BASE + slug(w) + '.jpg';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- 語音：中文講指令，英文只念單字 ---------- */
+const hasTTS = 'speechSynthesis' in window;
+if (hasTTS) { try { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => {}; } catch (e) {} }
+function pickVoice(lang) {
+  if (!hasTTS) return null;
+  let vs = [];
+  try { vs = speechSynthesis.getVoices(); } catch (e) { return null; }
+  if (!vs.length) return null;
+  const want = lang.toLowerCase();
+  return vs.filter(v => v.lang.toLowerCase().replace('_', '-') === want)[0]
+      || vs.filter(v => v.lang.toLowerCase().indexOf(want.slice(0, 2)) === 0)[0] || null;
+}
+let speechLock = 0;
+function stopSpeech() { speechLock++; if (hasTTS) { try { speechSynthesis.cancel(); } catch (e) {} } }
+function say(items, onDone) {
+  const myLock = ++speechLock;
+  if (!hasTTS) { if (onDone) setTimeout(onDone, 250); return; }
+  try { speechSynthesis.cancel(); } catch (e) {}
+  let i = 0;
+  const next = () => {
+    if (myLock !== speechLock) return;
+    if (i >= items.length) { onDone && onDone(); return; }
+    const it = items[i++];
+    if (!it || !it.text) { next(); return; }
+    let u;
+    try { u = new SpeechSynthesisUtterance(it.text); } catch (e) { onDone && onDone(); return; }
+    u.lang = it.lang || 'zh-TW';
+    const v = pickVoice(u.lang);
+    if (v) u.voice = v;
+    u.rate = it.rate || (u.lang.indexOf('en') === 0 ? 0.8 : 0.95);
+    const go = () => { if (it.pause) setTimeout(next, it.pause); else next(); };
+    u.onend = go; u.onerror = go;
+    try { speechSynthesis.speak(u); } catch (e) { go(); }
+  };
+  next();
+}
+const zh = (t, after) => say([{ text: t, lang: 'zh-TW' }], after);
+const en = (t, after) => say([{ text: t, lang: 'en-US' }], after);
+
+let actx = null;
+function beep(kind) {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const notes = kind === 'ok' ? [660, 880] : [330, 262];
+    notes.forEach((f, idx) => {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      const t = actx.currentTime + idx * 0.13;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t); o.stop(t + 0.24);
+    });
+  } catch (e) {}
+}
+document.addEventListener('pointerdown', () => {
+  if (hasTTS) { try { speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); } catch (e) {} }
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {}
+}, { once: true });
+
+/* ---------- 狀態 ---------- */
+const el = {
+  title: document.getElementById('title'),
+  stage: document.getElementById('stage'),
+  progress: document.getElementById('progress'),
+  pnum: document.getElementById('pnum'),
+  pfill: document.getElementById('pfill'),
+  btnSpeak: document.getElementById('btnSpeak'),
+  btnHome: document.getElementById('btnHome')
+};
+
+let sheets = [], quiz = null, qi = 0, tries = 0, wrongList = [], locked = false;
+const curQ = () => quiz.questions[qi];
+
+/* ---------- 載入 ---------- */
+async function loadList() {
+  el.stage.innerHTML = '<p class="note">載入中…</p>';
+  let names = [];
+  try {
+    const r = await fetch('quizzes/list.json', { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    names = await r.json();
+  } catch (e) {
+    el.stage.innerHTML =
+      '<div class="empty-note"><h2>讀不到練習卷</h2>' +
+      '<p class="note">這個頁面要用網址開才讀得到題目檔，直接點兩下檔案（<code>file://</code>）不行。<br><br>' +
+      '在專案資料夾執行 <code>python -m http.server 8000</code>，再開 <code>http://localhost:8000/practice/</code>。</p></div>';
+    return;
+  }
+  const loaded = await Promise.all(names.map(async n => {
+    try {
+      const r = await fetch('quizzes/' + n, { cache: 'no-store' });
+      if (!r.ok) return null;
+      const q = await r.json();
+      if (!q.id) q.id = n.replace(/\.json$/i, '');
+      return (q.questions && q.questions.length) ? q : null;
+    } catch (e) { return null; }
+  }));
+  sheets = loaded.filter(Boolean);
+  renderList();
+}
+
+function renderList() {
+  el.title.textContent = '喬登練習卷';
+  el.progress.hidden = true;
+  stopSpeech();
+  quiz = null;
+  el.stage.innerHTML = '';
+  if (!sheets.length) {
+    el.stage.innerHTML =
+      '<div class="empty-note"><h2>還沒有練習卷</h2>' +
+      '<p class="note">把喬登的考卷拍照丟進 <code>practice/exams/</code>，跟 Claude 說一聲，' +
+      '它看完題型就會出一份類似的放進 <code>practice/quizzes/</code>。</p></div>';
+    return;
+  }
+  const wrap = document.createElement('div');
+  wrap.className = 'list';
+  sheets.forEach(q => {
+    const res = store.results[q.id];
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sheet-card';
+    b.innerHTML =
+      '<span class="em">' + (q.emoji || '📝') + '</span>' +
+      '<span class="mid"><span class="t">' + esc(q.title) + '</span>' +
+      '<span class="m">' + esc(q.subject || '') + '　' + q.questions.length + ' 題' +
+      (q.source ? '　·　' + esc(q.source) : '') + '</span></span>' +
+      (res ? '<span class="score">' + res.right + '/' + res.total + ' ✔</span>' : '');
+    b.onclick = () => startQuiz(q);
+    wrap.appendChild(b);
+  });
+  el.stage.appendChild(wrap);
+  const tip = document.createElement('p');
+  tip.className = 'note';
+  tip.textContent = '點一下開始。指令都是中文語音，只有單字是英文。答錯會再給一次機會。';
+  el.stage.appendChild(tip);
+}
+
+/* ---------- 作答 ---------- */
+function startQuiz(q) {
+  quiz = q; qi = 0; tries = 0; wrongList = []; locked = false;
+  el.title.textContent = q.title;
+  el.progress.hidden = false;
+  renderQ();
+}
+
+function askText(q) {
+  if (q.askText) return q.askText;
+  switch (q.ask) {
+    case 'listen': return '聽聽看，是哪一個字？';
+    case 'pic':    return '看圖片，哪一個字是對的？';
+    case 'word':   return '這個字，是哪一張圖？';
+    case 'blank':  return '少了一個字母，是哪一個？';
+    default:       return '選選看。';
+  }
+}
+
+function speakQ() {
+  const q = curQ();
+  const w = q.word;
+  if (q.ask === 'listen') {
+    say([{ text: askText(q), lang: 'zh-TW', pause: 180 },
+         { text: w, lang: 'en-US', pause: 260 },
+         { text: w, lang: 'en-US' }]);
+  } else if (q.ask === 'blank') {
+    say([{ text: askText(q), lang: 'zh-TW', pause: 180 },
+         { text: w, lang: 'en-US', pause: 200 },
+         { text: w, lang: 'en-US' }]);
+  } else {
+    say([{ text: askText(q), lang: 'zh-TW' }]);
+  }
+}
+
+function renderQ() {
+  stopSpeech();
+  locked = false;
+  el.pnum.textContent = (qi + 1) + ' / ' + quiz.questions.length;
+  el.pfill.style.width = (qi / quiz.questions.length * 100) + '%';
+  const q = curQ();
+  el.stage.innerHTML = '';
+
+  /* 題目卡 */
+  const card = document.createElement('div');
+  card.className = 'qcard';
+  let body = '';
+  if (q.ask === 'listen') {
+    body = '<div class="qear">👂</div>';
+  } else if (q.ask === 'pic') {
+    body = '<img class="qpic" src="' + imgOf(q.word) + '" alt="">';
+  } else if (q.ask === 'word') {
+    body = '<div class="qword">' + esc(q.word) + '</div>';
+  } else if (q.ask === 'blank') {
+    const show = q.show || q.word;
+    body = '<div class="qword">' + show.split('').map(c =>
+      c === '_' ? '<span class="qblank">_</span>' : esc(c)).join(' ') + '</div>';
+  }
+  card.innerHTML =
+    '<span class="qtag">第 ' + (qi + 1) + ' 題' + (q.tag ? '　' + esc(q.tag) : '') + '</span>' +
+    body +
+    '<div class="qhint">' + esc(askText(q)) + '</div>';
+  el.stage.appendChild(card);
+
+  const fb = document.createElement('div');
+  fb.className = 'feedback'; fb.id = 'fb';
+  el.stage.appendChild(fb);
+
+  /* 選項 */
+  const box = document.createElement('div');
+  const n = q.choices.length;
+  box.className = 'choices ' + (n === 2 ? 'c2' : n === 4 ? 'c4' : 'c3');
+  q.choices.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'choice' + (q.opt === 'pic' ? ' pic' : '');
+    if (q.opt === 'pic') b.innerHTML = '<img src="' + imgOf(c) + '" alt="">';
+    else b.textContent = c;
+    b.onclick = () => {
+      if (locked) return;
+      if (i === q.answer) { locked = true; b.classList.add('right'); right(q); }
+      else { b.classList.add('wrong'); b.disabled = true; wrong(q, c); }
+    };
+    box.appendChild(b);
+  });
+  el.stage.appendChild(box);
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  actions.innerHTML =
+    '<button class="b-listen" type="button">🔊<span class="b-sub">再念一次</span></button>' +
+    '<button class="b-go" type="button">⏭<span class="b-sub">先跳過</span></button>';
+  actions.children[0].onclick = speakQ;
+  actions.children[1].onclick = () => { markWrong(q, '（跳過）'); nextQ(); };
+  el.stage.appendChild(actions);
+
+  setTimeout(speakQ, 220);
+}
+
+function right(q) {
+  beep('ok');
+  const fb = document.getElementById('fb');
+  fb.className = 'feedback good';
+  fb.textContent = tries === 0 ? '答對了！ ' + q.word : '這次對了！ ' + q.word;
+  say([
+    { text: tries === 0 ? '答對了！' : '這次對了，很棒。', lang: 'zh-TW', pause: 150 },
+    { text: q.word, lang: 'en-US' }
+  ], () => setTimeout(nextQ, 500));
+}
+
+function wrong(q, picked) {
+  beep('no');
+  tries++;
+  markWrong(q, picked);
+  const fb = document.getElementById('fb');
+  fb.className = 'feedback oops';
+  if (tries >= 2) {
+    locked = true;
+    const correct = q.choices[q.answer];
+    fb.textContent = '答案是 ' + correct;
+    say([
+      { text: '沒關係，答案是', lang: 'zh-TW', pause: 120 },
+      { text: q.word, lang: 'en-US', pause: 220 },
+      { text: q.word, lang: 'en-US' }
+    ], () => setTimeout(nextQ, 700));
+  } else {
+    fb.textContent = '再想想看';
+    say([{ text: '再想想看。', lang: 'zh-TW', pause: 150 }, { text: q.word, lang: 'en-US' }]);
+  }
+}
+
+function markWrong(q, picked) {
+  if (wrongList.some(w => w.i === qi)) return;
+  wrongList.push({ i: qi, word: q.word, picked: picked, answer: q.choices[q.answer] });
+}
+
+function nextQ() {
+  stopSpeech();
+  qi++; tries = 0;
+  if (qi >= quiz.questions.length) return renderDone();
+  renderQ();
+}
+
+/* ---------- 完成 ---------- */
+function renderDone() {
+  const total = quiz.questions.length;
+  const rightN = total - wrongList.length;
+  store.results[quiz.id] = { right: rightN, total: total, date: new Date().toISOString().slice(0, 10), wrong: wrongList.map(w => w.word) };
+  save();
+  el.progress.hidden = true;
+  beep('ok');
+
+  el.stage.innerHTML = '';
+  const perfect = wrongList.length === 0;
+  const box = document.createElement('div');
+  box.className = 'done';
+  box.innerHTML =
+    '<div class="em">' + (perfect ? '🏆' : rightN >= total * 0.7 ? '🎉' : '💪') + '</div>' +
+    '<h2>' + (perfect ? '全部答對！太厲害了' : '寫完了！答對 ' + rightN + ' / ' + total + ' 題') + '</h2>' +
+    (wrongList.length
+      ? '<div class="chiplist">' + wrongList.map(w => '<span class="chip">' + esc(w.word) + '</span>').join('') + '</div><p class="note">這幾個字下次再練一下</p>'
+      : '<p class="note">全部一次就對，可以去玩了！</p>');
+  el.stage.appendChild(box);
+
+  const ta = document.createElement('textarea');
+  ta.className = 'report';
+  ta.value = quiz.title + '：答對 ' + rightN + ' / ' + total + ' 題。' +
+    (wrongList.length
+      ? '\n不熟的字：' + wrongList.map(w => w.word).join(', ') +
+        '\n（' + wrongList.map(w => w.word + ' 選成 ' + w.picked).join('；') + '）'
+      : '\n全部答對。');
+  el.stage.appendChild(ta);
+
+  const row = document.createElement('div');
+  row.className = 'actions';
+  row.innerHTML =
+    '<button class="mini" type="button">📋 複製紀錄</button>' +
+    '<button class="b-listen" type="button">↻<span class="b-sub">再寫一次</span></button>' +
+    '<button class="b-go" type="button">📋<span class="b-sub">回清單</span></button>';
+  row.children[0].onclick = async () => {
+    try { await navigator.clipboard.writeText(ta.value); toast('複製好了'); }
+    catch (e) { ta.select(); toast('請長按選取複製'); }
+  };
+  row.children[1].onclick = () => startQuiz(quiz);
+  row.children[2].onclick = renderList;
+  el.stage.appendChild(row);
+
+  zh(perfect ? '全部答對，太厲害了！' : '寫完了，答對' + rightN + '題。');
+}
+
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 1900);
+}
+
+el.btnSpeak.onclick = () => { if (quiz) speakQ(); };
+el.btnHome.onclick = () => { stopSpeech(); renderList(); };
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopSpeech(); });
+
+loadList();
+</script>
+</body>
+</html>

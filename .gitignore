@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+
+# 金鑰與本機設定（實際金鑰走 GitHub Secrets，不要放進 repo）
+.env
+config.json
+
+# doorbell 是另一個獨立的 git 專案，不要一起帶上來
+doorbell/
+
+# 字卡原始照片（裁好的在 img/ 底下，原圖不用上傳）
+flashcards/img/_source/
+
+# 考卷照片是小孩的個人資料，不要公開
+practice/exams/*
+!practice/exams/README.md
+
+# 編輯器
+.vscode/
+.idea/
+.DS_Store

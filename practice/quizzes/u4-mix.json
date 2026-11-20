@@ -1,0 +1,168 @@
+{
+  "id": "u4-mix",
+  "title": "Unit 4 綜合練習",
+  "subject": "Unit 4 · 人物、G / H 自然發音",
+  "source": "依字卡自動產生",
+  "emoji": "🎁",
+  "questions": [
+    {
+      "ask": "pic",
+      "opt": "text",
+      "tag": "看圖選字",
+      "word": "Jack",
+      "choices": [
+        "Ricky",
+        "Jack",
+        "Tina"
+      ],
+      "answer": 1
+    },
+    {
+      "ask": "listen",
+      "opt": "text",
+      "tag": "聽音選字",
+      "word": "May",
+      "choices": [
+        "May",
+        "Jill",
+        "Jack"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "word",
+      "opt": "pic",
+      "tag": "看字選圖",
+      "word": "Ricky",
+      "choices": [
+        "Ricky",
+        "Tina",
+        "Jill"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "blank",
+      "opt": "letter",
+      "tag": "拼拼看",
+      "word": "girl",
+      "show": "_irl",
+      "choices": [
+        "j",
+        "i",
+        "g"
+      ],
+      "answer": 2
+    },
+    {
+      "ask": "pic",
+      "opt": "text",
+      "tag": "看圖選字",
+      "word": "Jill",
+      "choices": [
+        "Jack",
+        "Jill",
+        "May"
+      ],
+      "answer": 1
+    },
+    {
+      "ask": "listen",
+      "opt": "text",
+      "tag": "聽音選字",
+      "word": "Tina",
+      "choices": [
+        "Tina",
+        "May",
+        "Ricky"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "word",
+      "opt": "pic",
+      "tag": "看字選圖",
+      "word": "gum",
+      "choices": [
+        "gum",
+        "gift",
+        "gun"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "blank",
+      "opt": "letter",
+      "tag": "拼拼看",
+      "word": "gift",
+      "show": "_ift",
+      "choices": [
+        "g",
+        "j",
+        "k"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "pic",
+      "opt": "text",
+      "tag": "看圖選字",
+      "word": "hop",
+      "choices": [
+        "hop",
+        "hand",
+        "hat"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "listen",
+      "opt": "text",
+      "tag": "聽音選字",
+      "word": "gun",
+      "choices": [
+        "girl",
+        "gun",
+        "gum"
+      ],
+      "answer": 1
+    },
+    {
+      "ask": "word",
+      "opt": "pic",
+      "tag": "看字選圖",
+      "word": "ham",
+      "choices": [
+        "ham",
+        "hop",
+        "hand"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "blank",
+      "opt": "letter",
+      "tag": "拼拼看",
+      "word": "hand",
+      "show": "_and",
+      "choices": [
+        "g",
+        "k",
+        "h"
+      ],
+      "answer": 2
+    },
+    {
+      "ask": "pic",
+      "opt": "text",
+      "tag": "看圖選字",
+      "word": "hat",
+      "choices": [
+        "hat",
+        "ham",
+        "hand"
+      ],
+      "answer": 0
+    }
+  ]
+}

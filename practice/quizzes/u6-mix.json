@@ -1,0 +1,168 @@
+{
+  "id": "u6-mix",
+  "title": "Unit 6 綜合練習",
+  "subject": "Unit 6 · 形容詞、K / L 自然發音",
+  "source": "依字卡自動產生",
+  "emoji": "👑",
+  "questions": [
+    {
+      "ask": "pic",
+      "opt": "text",
+      "tag": "看圖選字",
+      "word": "tall",
+      "choices": [
+        "fat",
+        "short",
+        "tall"
+      ],
+      "answer": 2
+    },
+    {
+      "ask": "listen",
+      "opt": "text",
+      "tag": "聽音選字",
+      "word": "short",
+      "choices": [
+        "short",
+        "thin",
+        "cute"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "word",
+      "opt": "pic",
+      "tag": "看字選圖",
+      "word": "kiss",
+      "choices": [
+        "kiss",
+        "king",
+        "kick"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "blank",
+      "opt": "letter",
+      "tag": "拼拼看",
+      "word": "fat",
+      "show": "f_t",
+      "choices": [
+        "u",
+        "o",
+        "a"
+      ],
+      "answer": 2
+    },
+    {
+      "ask": "pic",
+      "opt": "text",
+      "tag": "看圖選字",
+      "word": "thin",
+      "choices": [
+        "thin",
+        "short",
+        "tall"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "listen",
+      "opt": "text",
+      "tag": "聽音選字",
+      "word": "lips",
+      "choices": [
+        "lips",
+        "lamp",
+        "leg"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "word",
+      "opt": "pic",
+      "tag": "看字選圖",
+      "word": "cute",
+      "choices": [
+        "fat",
+        "thin",
+        "cute"
+      ],
+      "answer": 2
+    },
+    {
+      "ask": "blank",
+      "opt": "letter",
+      "tag": "拼拼看",
+      "word": "king",
+      "show": "_ing",
+      "choices": [
+        "l",
+        "k",
+        "h"
+      ],
+      "answer": 1
+    },
+    {
+      "ask": "pic",
+      "opt": "text",
+      "tag": "看圖選字",
+      "word": "leg",
+      "choices": [
+        "leg",
+        "lock",
+        "lamp"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "listen",
+      "opt": "text",
+      "tag": "聽音選字",
+      "word": "lamp",
+      "choices": [
+        "lips",
+        "lamp",
+        "leg"
+      ],
+      "answer": 1
+    },
+    {
+      "ask": "word",
+      "opt": "pic",
+      "tag": "看字選圖",
+      "word": "kick",
+      "choices": [
+        "kiss",
+        "kick",
+        "king"
+      ],
+      "answer": 1
+    },
+    {
+      "ask": "blank",
+      "opt": "letter",
+      "tag": "拼拼看",
+      "word": "lock",
+      "show": "_ock",
+      "choices": [
+        "j",
+        "k",
+        "l"
+      ],
+      "answer": 2
+    },
+    {
+      "ask": "pic",
+      "opt": "text",
+      "tag": "看圖選字",
+      "word": "kit",
+      "choices": [
+        "kit",
+        "king",
+        "kiss"
+      ],
+      "answer": 0
+    }
+  ]
+}

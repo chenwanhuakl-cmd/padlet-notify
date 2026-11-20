@@ -1,0 +1,1492 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2E9E5B">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>">
+<title>喬登單字卡</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap">
+<style>
+  /* 版面：上面 單元→組別，中間一張大卡片，下面一顆超大麥克風。全程中文語音帶著走。 */
+  :root {
+    --bg: #F2F7F3;
+    --surface: #FFFFFF;
+    --ink: #1C2B23;
+    --muted: #5F7367;
+    --line: #D7E4DB;
+    --accent: #2E9E5B;
+    --accent-soft: #DCF2E4;
+    --sun: #F2A91B;
+    --coral: #E4654A;
+    --shadow: 0 10px 24px rgba(28,43,35,.10);
+    --font-display: "Fredoka", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+    --font-body: "Nunito", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111A15; --surface: #1B2620; --ink: #E9F2EC; --muted: #9CB0A4;
+      --line: #2B3A32; --accent: #4FD17F; --accent-soft: #1E3828;
+      --sun: #F7C560; --coral: #FF8468; --shadow: 0 10px 24px rgba(0,0,0,.45);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111A15; --surface: #1B2620; --ink: #E9F2EC; --muted: #9CB0A4;
+    --line: #2B3A32; --accent: #4FD17F; --accent-soft: #1E3828;
+    --sun: #F7C560; --coral: #FF8468; --shadow: 0 10px 24px rgba(0,0,0,.45);
+    color-scheme: dark;
+  }
+
+  html, body { height: 100%; }
+  :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; -webkit-tap-highlight-color: transparent; }
+  * { box-sizing: border-box; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--sun); outline-offset: 3px; }
+
+  #app {
+    min-height: 100%; display: flex; flex-direction: column; gap: 10px;
+    padding-block: 10px 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    max-width: 720px; margin: 0 auto;
+  }
+
+  /* ---------- 單元 / 組別 ---------- */
+  .topbar { display: flex; align-items: center; gap: 8px; }
+  .units { display: flex; gap: 6px; flex: 1; min-width: 0; flex-wrap: wrap; }
+  .pill { border: 2px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 13px; font-weight: 700; font-size: 15px; line-height: 1.2; }
+  .pill[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .sets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sets .pill { font-size: 14px; padding: 5px 12px; }
+  .icon-btn { border: 2px solid var(--line); background: var(--surface); border-radius: 999px; width: 40px; height: 40px; display: grid; place-items: center; font-size: 17px; flex: none; }
+
+  .statusbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--surface); border: 2px solid var(--line); border-radius: 16px; padding: 8px 13px; }
+  .round-tag { font-family: var(--font-display); font-weight: 600; font-size: 15px; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 3px 12px; }
+  .stars { display: flex; gap: 4px; font-size: 18px; line-height: 1; flex: 1; min-width: 0; flex-wrap: wrap; }
+  .star { filter: grayscale(1); opacity: .3; transition: transform .25s, filter .25s, opacity .25s; }
+  .star.on { filter: none; opacity: 1; transform: scale(1.14); }
+  .today { font-size: 12.5px; color: var(--muted); font-weight: 700; width: 100%; }
+
+  /* ---------- 卡片 ---------- */
+  .stage { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+  .card { position: relative; width: 100%; aspect-ratio: 5 / 4; max-height: 44vh; border: 0; padding: 0; background: none; perspective: 1200px; }
+  .card-inner { position: absolute; inset: 0; transition: transform .5s cubic-bezier(.3,.9,.3,1.1); transform-style: preserve-3d; }
+  .card.flipped .card-inner { transform: rotateY(180deg); }
+  .face {
+    position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    background: var(--surface); border: 3px solid var(--line); border-radius: 26px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px; overflow: hidden;
+  }
+  .face.back { transform: rotateY(180deg); border-color: var(--accent); }
+  .pic { font-size: clamp(66px, 22vw, 128px); line-height: 1.05; }
+  .cardpic { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; display: block; }
+  .word { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 8vw, 48px); line-height: 1.1; text-align: center; }
+  .textcard { font-family: var(--font-display); font-weight: 600; font-size: clamp(38px, 13vw, 84px); line-height: 1.12; text-align: center; word-break: break-word; }
+  .zh { font-size: 16px; color: var(--muted); font-weight: 700; }
+  .card-count { font-size: 13px; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+
+  /* ---------- 麥克風 ---------- */
+  .mic-zone { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .say-line { font-family: var(--font-display); font-size: clamp(19px, 5.4vw, 27px); font-weight: 600; text-align: center; text-wrap: balance; line-height: 1.35; min-height: 1.4em; }
+  .say-line.good { color: var(--accent); }
+  .say-line.oops { color: var(--coral); }
+  .qword { color: var(--accent); font-family: var(--font-display); font-size: 1.3em; font-weight: 700; }
+  .heard { font-size: 13px; color: var(--muted); min-height: 1.2em; }
+  .mic {
+    position: relative; width: clamp(92px, 24vw, 120px); height: clamp(92px, 24vw, 120px);
+    border-radius: 50%; border: 4px solid var(--accent); background: var(--accent-soft);
+    font-size: clamp(38px, 10vw, 50px); display: grid; place-items: center; box-shadow: var(--shadow); transition: transform .15s;
+  }
+  .mic:active { transform: scale(.94); }
+  .mic.live { background: var(--accent); border-color: var(--accent); }
+  .mic.live::before, .mic.live::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 4px solid var(--accent); animation: ring 1.5s ease-out infinite; }
+  .mic.live::after { animation-delay: .75s; }
+  @keyframes ring { to { transform: scale(1.7); opacity: 0; } }
+
+  /* ---------- 按鈕列 ---------- */
+  .actions { display: flex; gap: 8px; }
+  .actions button { flex: 1; min-width: 0; border-radius: 16px; border: 3px solid var(--line); background: var(--surface); padding: 11px 6px; font-weight: 800; font-size: 16px; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: transform .12s; }
+  .actions button:active { transform: scale(.96); }
+  .b-sub { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .b-listen { border-color: var(--sun); }
+  .b-again { border-color: var(--coral); color: var(--coral); }
+  .b-got { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .b-wide { width: 100%; }
+
+  /* ---------- 完成 ---------- */
+  .done-box { text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .done-title { font-family: var(--font-display); font-size: clamp(25px, 7.6vw, 42px); font-weight: 700; color: var(--accent); text-wrap: balance; }
+  .trophy { font-size: clamp(68px, 22vw, 120px); animation: pop .6s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes pop { from { transform: scale(.3) rotate(-18deg); } }
+  .confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+  .confetti i { position: absolute; top: -8%; width: 11px; height: 15px; border-radius: 3px; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(115vh) rotate(760deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .card-inner, .actions button, .mic, .star { transition: none; }
+    .trophy { animation: none; } .confetti { display: none; } .mic.live::before, .mic.live::after { animation: none; }
+  }
+
+  /* ---------- 家長頁 ---------- */
+  .sheet { background: var(--surface); border: 2px solid var(--line); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 13px; }
+  .sheet h2 { font-family: var(--font-display); font-size: 20px; margin: 0; }
+  .sheet h3 { font-size: 14px; margin: 0 0 7px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
+  .chiplist { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { border-radius: 999px; padding: 4px 11px; font-size: 14px; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
+  .chip.warn { background: color-mix(in srgb, var(--coral) 16%, transparent); color: var(--coral); }
+  .note { font-size: 13.5px; color: var(--muted); line-height: 1.65; margin: 0; }
+  .report { width: 100%; min-height: 92px; border: 2px solid var(--line); border-radius: 14px; background: var(--bg); color: var(--ink); padding: 10px 12px; font: inherit; font-size: 14px; line-height: 1.6; resize: vertical; }
+  .mini { border: 2px solid var(--line); background: var(--bg); border-radius: 12px; padding: 9px 14px; font-weight: 700; font-size: 15px; }
+  .mini.danger { color: var(--coral); border-color: var(--coral); }
+  input[type="range"] { accent-color: var(--accent); flex: 1; min-width: 140px; }
+  .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 15px; z-index: 9; max-width: 86vw; text-align: center; }
+
+  /* 範圍設定 */
+  .scope-unit { border: 2px solid var(--line); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .scope-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .scope-head strong { font-family: var(--font-display); font-size: 17px; }
+  .scope-sets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .scope-sets .pill { font-size: 14px; }
+  .rounds { display: flex; gap: 6px; }
+
+  /* 圖片管理 */
+  .picgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 9px; }
+  .piccell { border: 2px solid var(--line); border-radius: 14px; background: var(--bg); padding: 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .piccell .box { width: 100%; aspect-ratio: 1; display: grid; place-items: center; overflow: hidden; border-radius: 9px; font-size: 32px; background: var(--surface); }
+  .piccell .box img { width: 100%; height: 100%; object-fit: contain; }
+  .piccell .nm { font-size: 12.5px; font-weight: 800; word-break: break-word; text-align: center; line-height: 1.2; }
+  .piccell .ops { display: flex; gap: 4px; }
+  .piccell .ops button { border: 0; background: none; font-size: 15px; padding: 2px 5px; border-radius: 8px; }
+  .piccell .ops button:hover { background: var(--accent-soft); }
+  .piccell .ops a { font-size: 15px; padding: 2px 5px; border-radius: 8px; text-decoration: none; }
+  .piccell .ops a:hover { background: var(--accent-soft); }
+  .logbox {
+    width: 100%; max-height: 260px; overflow: auto;
+    border: 2px solid var(--line); border-radius: 14px; background: var(--bg);
+    padding: 10px 12px; margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+  }
+
+  /* 裁切視窗 */
+  .modal {
+    position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.78);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    padding: max(16px, env(safe-area-inset-left, 0px));
+  }
+  .modal-title { color: #fff; font-family: var(--font-display); font-size: 20px; font-weight: 600; text-align: center; }
+  .modal-hint { color: #d8e4dc; font-size: 13.5px; text-align: center; max-width: 34em; }
+  .cropwrap { position: relative; max-width: 100%; line-height: 0; touch-action: none; }
+  .cropwrap img { max-width: 100%; max-height: 56vh; display: block; }
+  .cropbox { position: absolute; border: 3px solid #fff; box-shadow: 0 0 0 9999px rgba(0,0,0,.5); cursor: move; touch-action: none; }
+  .cropbox .handle {
+    position: absolute; right: -15px; bottom: -15px; width: 30px; height: 30px;
+    border-radius: 50%; background: #fff; border: 3px solid var(--accent); cursor: nwse-resize; touch-action: none;
+  }
+  .modal-ops { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .modal-ops .mini { background: #fff; color: #1C2B23; border-color: #fff; }
+  .modal-ops .mini.ok { background: #2E9E5B; border-color: #2E9E5B; color: #fff; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="topbar">
+    <div class="units" id="units"></div>
+    <button class="icon-btn" id="btnQuiz" title="考考我">🎧</button>
+    <button class="icon-btn" id="btnPics" title="上傳字卡圖片">📷</button>
+    <button class="icon-btn" id="btnParent" title="家長設定">👩</button>
+  </div>
+  <div class="sets" id="sets"></div>
+  <div class="statusbar" id="statusbar">
+    <span class="round-tag" id="roundTag">第 1 輪</span>
+    <div class="stars" id="stars"></div>
+    <div class="today" id="todayLine"></div>
+  </div>
+  <div class="stage" id="stage"></div>
+</div>
+<input type="file" id="picInput" accept="image/*" hidden>
+
+<script>
+/* ==========================================================================
+   單字資料
+   一個 unit（課本單元）底下放好幾個 set（成套的字卡，通常 4 張一組）。
+   word: { en: 英文, zh: 中文, pic: 預設圖（emoji）, alt: ['可能被聽成的拼法'] ← 選填 }
+   老師發的真實圖卡，不用改這裡 —— 在「家長設定 → 字卡圖片」直接拍照上傳就好。
+   ========================================================================== */
+const UNITS = [
+  {
+    id: 'u4', name: 'Unit 4',
+    sets: [
+      // spell: true → 這組要先拼字母再念整個字（J-a-c-k, Jack）
+      { id: 'u4-people', name: '人物', spell: true, words: [   // 13-1 ~ 13-5
+        { en: 'Jack',  zh: '傑克', pic: '👦' },
+        { en: 'Jill',  zh: '吉兒', pic: '👧' },
+        { en: 'Ricky', zh: '瑞奇', pic: '🧑' },
+        { en: 'Tina',  zh: '蒂娜', pic: '👩' },
+        { en: 'May',   zh: '梅',   pic: '👧' }
+      ]},
+      { id: 'u4-g', name: 'G 開頭', words: [      // 13-6 ~ 13-9
+        { en: 'gum',  zh: '口香糖', pic: '🍬' },
+        { en: 'gift', zh: '禮物',   pic: '🎁' },
+        { en: 'girl', zh: '女孩',   pic: '👧' },
+        { en: 'gun',  zh: '槍',     pic: '🔫' }
+      ]},
+      { id: 'u4-h', name: 'H 開頭', words: [      // 13-10 ~ 13-13
+        { en: 'ham',  zh: '火腿',   pic: '🍖' },
+        { en: 'hat',  zh: '帽子',   pic: '🎩' },
+        { en: 'hand', zh: '手',     pic: '✋' },
+        { en: 'hop',  zh: '單腳跳', pic: '🦘', alt: ['hope'] }
+      ]}
+    ]
+  },
+  {
+    id: 'u5', name: 'Unit 5',
+    sets: [
+      { id: 'u5-num', name: '數字 7–12', words: [ // 14-1 ~ 14-6
+        { en: 'seven',  zh: '七',   pic: '7️⃣' },
+        { en: 'eight',  zh: '八',   pic: '8️⃣', alt: ['ate'] },
+        { en: 'nine',   zh: '九',   pic: '9️⃣' },
+        { en: 'ten',    zh: '十',   pic: '🔟' },
+        { en: 'eleven', zh: '十一', pic: '🕚' },
+        { en: 'twelve', zh: '十二', pic: '🕛' }
+      ]},
+      { id: 'u5-i', name: 'I 開頭', words: [      // 14-7 ~ 14-10
+        { en: 'ink',    zh: '墨水',     pic: '🖋️', alt: ['inc'] },
+        { en: 'insect', zh: '昆蟲',     pic: '🐞' },
+        { en: 'Indian', zh: '印地安人', pic: '🪶' },
+        { en: 'igloo',  zh: '冰屋',     pic: '🏠' }
+      ]},
+      { id: 'u5-j', name: 'J 開頭', words: [      // 14-11 ~ 14-14
+        { en: 'jam',  zh: '果醬',   pic: '🍓' },
+        { en: 'jump', zh: '跳',     pic: '🤸' },
+        { en: 'jet',  zh: '噴射機', pic: '✈️' },
+        { en: 'jar',  zh: '玻璃罐', pic: '🫙' }
+      ]}
+    ]
+  },
+  {
+    id: 'u6', name: 'Unit 6',
+    sets: [
+      { id: 'u6-adj', name: '形容詞', words: [    // 13-1 ~ 13-5
+        { en: 'cute',  zh: '可愛的', pic: '🥰' },
+        { en: 'tall',  zh: '高的',   pic: '🧍' },
+        { en: 'short', zh: '矮的',   pic: '🧒' },
+        { en: 'fat',   zh: '胖的',   pic: '🧔' },
+        { en: 'thin',  zh: '瘦的',   pic: '🙍' }
+      ]},
+      { id: 'u6-k', name: 'K 開頭', words: [      // 13-6 ~ 13-9
+        { en: 'kiss', zh: '親親',   pic: '😘' },
+        { en: 'kit',  zh: '急救箱', pic: '🧰' },
+        { en: 'king', zh: '國王',   pic: '🤴' },
+        { en: 'kick', zh: '踢',     pic: '⚽' }
+      ]},
+      { id: 'u6-l', name: 'L 開頭', words: [      // 13-10 ~ 13-13
+        { en: 'lamp', zh: '檯燈',   pic: '💡' },
+        { en: 'leg',  zh: '腿',     pic: '🦵' },
+        { en: 'lips', zh: '嘴唇',   pic: '👄', alt: ['lip'] },
+        { en: 'lock', zh: '鎖',     pic: '🔒' }
+      ]}
+    ]
+  }
+];
+UNITS.forEach(u => u.sets.forEach(s => s.words.forEach(w => { w._key = s.id + '|' + w.en; })));
+
+/* ========================= 設定與進度 ========================= */
+const STORE_KEY = 'jordan-cards-v3';
+const MAX_TRIES = 2;   // 聽兩次還是不行就帶著他複誦、然後過關
+
+function allSetIds() { const out = []; UNITS.forEach(u => u.sets.forEach(s => out.push(s.id))); return out; }
+const defaults = { rate: 0.8, zhHints: true, useMic: true, rounds: 2, activeSets: allSetIds(), knownSets: allSetIds() };
+let settings = { ...defaults };
+let progress = { date: today(), sets: {} };
+
+function today() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function load() {
+  try {
+    const data = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+    if (data.settings) settings = { ...defaults, ...data.settings };
+    const ids = allSetIds();
+    if (!Array.isArray(settings.activeSets)) settings.activeSets = ids.slice();
+    settings.activeSets = settings.activeSets.filter(id => ids.indexOf(id) > -1);
+    // 之後新增的組別（老師發新字卡）要自動出現，不能被舊的設定擋掉
+    const known = Array.isArray(settings.knownSets) ? settings.knownSets : [];
+    ids.forEach(id => {
+      if (known.indexOf(id) === -1 && settings.activeSets.indexOf(id) === -1) settings.activeSets.push(id);
+    });
+    settings.knownSets = ids.slice();
+    if (!settings.activeSets.length) settings.activeSets = ids.slice();
+    if (data.progress && data.progress.date === today()) progress = data.progress;
+    save();
+  } catch (e) {}
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ settings, progress })); } catch (e) {}
+}
+function setProgress(id) {
+  if (!progress.sets[id]) progress.sets[id] = { round: 1, shaky: [] };
+  return progress.sets[id];
+}
+
+/* ========================= 除錯紀錄 =========================
+   手機上看不到瀏覽器 console，所以自己留一份，測完可以整份複製貼給 Claude。 */
+const LOG = [];
+function log(tag, data) {
+  const d = new Date();
+  const ts = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
+  let txt = '';
+  try { txt = (data === undefined) ? '' : (typeof data === 'string' ? data : JSON.stringify(data)); }
+  catch (e) { txt = String(data); }
+  LOG.push(ts + ' [' + tag + '] ' + txt);
+  if (LOG.length > 400) LOG.shift();
+}
+function logHead() {
+  return [
+    '=== 喬登單字卡 測試紀錄 ===',
+    '時間: ' + new Date().toLocaleString('zh-TW'),
+    '網址: ' + location.href,
+    '安全來源(麥克風前提): ' + (window.isSecureContext ? '是 ✔' : '否 ✘ ← 麥克風不會動'),
+    '裝置: ' + navigator.userAgent,
+    '麥克風模式: ' + micMode + '　（native=瀏覽器辨識 / dictation=Claude / none=不支援）',
+    '語音合成: ' + (hasTTS ? '有' : '無'),
+    '設定: 語速 ' + settings.rate + '、中文提示 ' + settings.zhHints + '、用麥克風 ' + settings.useMic,
+    '==========================='
+  ].join('\n');
+}
+function logText() { return logHead() + '\n' + LOG.join('\n'); }
+function logVoices() {
+  if (!hasTTS) { log('tts', '這台裝置不支援語音合成'); return; }
+  let vs = [];
+  try { vs = speechSynthesis.getVoices(); } catch (e) {}
+  log('tts-voices', vs.length + ' 個可用語音');
+  const ev = pickVoice('en-US'), zv = pickVoice('zh-TW');
+  log('tts-pick', 'en-US → ' + (ev ? ev.name + ' / ' + ev.lang : '找不到，用系統預設（英文可能會變成中文腔）') +
+                 '　|　zh-TW → ' + (zv ? zv.name + ' / ' + zv.lang : '找不到，用系統預設（中文提示可能不會念）'));
+}
+
+/* 今天的範圍 */
+function allPairs() { const out = []; UNITS.forEach(u => u.sets.forEach(s => out.push({ u, s }))); return out; }
+function activePairs() {
+  const a = allPairs().filter(p => settings.activeSets.indexOf(p.s.id) > -1);
+  return a.length ? a : allPairs();
+}
+function cur() { return activePairs().filter(p => p.s.id === state.setId)[0] || activePairs()[0]; }
+const unit = () => cur().u;
+const cardSet = () => cur().s;
+const siblings = () => cardSet().words.map(w => w.en);
+const curWord = () => state.queue[state.pos];
+function setDone(id) { const p = progress.sets[id]; return !!p && (p.round - 1) >= settings.rounds; }
+function allSetsDone() { return activePairs().every(p => setDone(p.s.id)); }
+
+/* ========================= 字卡圖片（存在平板本機 IndexedDB） ========================= */
+let picDB = null;
+const pics = new Map();
+
+function openPicDB() {
+  return new Promise(res => {
+    try {
+      const req = indexedDB.open('jordan-cards', 1);
+      req.onupgradeneeded = () => { try { req.result.createObjectStore('pics'); } catch (e) {} };
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => res(null);
+    } catch (e) { res(null); }
+  });
+}
+function loadPics() {
+  return new Promise(async res => {
+    picDB = await openPicDB();
+    if (!picDB) return res();
+    try {
+      const req = picDB.transaction('pics', 'readonly').objectStore('pics').openCursor();
+      req.onsuccess = e => {
+        const c = e.target.result;
+        if (c) { pics.set(c.key, c.value); c.continue(); } else res();
+      };
+      req.onerror = () => res();
+    } catch (e) { res(); }
+  });
+}
+function savePic(key, dataUrl) {
+  pics.set(key, dataUrl);
+  if (!picDB) { toast('這台裝置不能存圖片'); return; }
+  try { picDB.transaction('pics', 'readwrite').objectStore('pics').put(dataUrl, key); } catch (e) {}
+}
+function delPic(key) {
+  pics.delete(key);
+  if (!picDB) return;
+  try { picDB.transaction('pics', 'readwrite').objectStore('pics').delete(key); } catch (e) {}
+}
+/* --- img/ 資料夾裡的圖檔（放檔名 = 單字，例如 img/gift.jpg）--- */
+const filePics = new Map();
+const IMG_EXTS = ['jpg', 'png', 'jpeg', 'webp', 'JPG', 'PNG'];
+function slug(w) { return w.en.toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
+function probeImg(url) {
+  return new Promise(res => {
+    const i = new Image();
+    i.onload = () => res(true);
+    i.onerror = () => res(false);
+    i.src = url;
+  });
+}
+function loadFilePics() {
+  const jobs = [];
+  allPairs().forEach(p => p.s.words.forEach(w => {
+    jobs.push((async () => {
+      for (const e of IMG_EXTS) {
+        const url = 'img/' + slug(w) + '.' + e;
+        if (await probeImg(url)) { filePics.set(w._key, url); return; }
+      }
+    })());
+  }));
+  return Promise.all(jobs);
+}
+
+/** 圖片優先序：家長頁拍的 > img/ 資料夾裡的檔案 > 預設 emoji */
+function picSrc(w) { return pics.get(w._key) || filePics.get(w._key) || null; }
+function picHTML(w, cls) {
+  const src = picSrc(w);
+  if (src) return '<img class="' + (cls || 'cardpic') + '" src="' + src + '" alt="">';
+  return '<div class="pic">' + w.pic + '</div>';
+}
+
+/* ========================= 說話 ========================= */
+const hasTTS = 'speechSynthesis' in window;
+let voicesLogged = false;
+if (hasTTS) {
+  try {
+    speechSynthesis.getVoices();
+    speechSynthesis.onvoiceschanged = () => { if (!voicesLogged) { voicesLogged = true; logVoices(); } };
+  } catch (e) {}
+}
+
+function pickVoice(lang) {
+  if (!hasTTS) return null;
+  let vs = [];
+  try { vs = speechSynthesis.getVoices(); } catch (e) { return null; }
+  if (!vs.length) return null;
+  const want = lang.toLowerCase();
+  return vs.filter(v => v.lang.toLowerCase().replace('_', '-') === want)[0]
+      || vs.filter(v => v.lang.toLowerCase().indexOf(want.slice(0, 2)) === 0)[0]
+      || null;
+}
+let speechLock = 0;
+function stopSpeech() { speechLock++; if (hasTTS) { try { speechSynthesis.cancel(); } catch (e) {} } }
+
+function say(items, onDone) {
+  const myLock = ++speechLock;
+  if (!hasTTS) { if (onDone) setTimeout(onDone, 300); return; }
+  try { speechSynthesis.cancel(); } catch (e) {}
+  let i = 0;
+  const next = () => {
+    if (myLock !== speechLock) return;
+    if (i >= items.length) { onDone && onDone(); return; }
+    const it = items[i++];
+    if (!it || !it.text) { next(); return; }
+    let u;
+    try { u = new SpeechSynthesisUtterance(it.text); } catch (e) { onDone && onDone(); return; }
+    u.lang = it.lang || 'en-US';
+    const v = pickVoice(u.lang);
+    if (v) u.voice = v;
+    u.rate = it.rate || (u.lang.indexOf('en') === 0 ? settings.rate : 1);
+    u.pitch = 1.05;
+    const go = () => { if (it.pause) setTimeout(next, it.pause); else next(); };
+    u.onend = go; u.onerror = go;
+    try { speechSynthesis.speak(u); } catch (e) { go(); }
+  };
+  next();
+}
+function zh(text, after) { say([{ text: text, lang: 'zh-TW' }], after); }
+
+/** 這一組要不要拼字母（只有人物卡要：J-a-c-k, Jack） */
+function spellMode() { try { return !!cardSet().spell; } catch (e) { return false; } }
+
+/** 念單字給他聽。
+ *  一般組：直接念整個字（慢一次、正常一次），不拼字母。
+ *  人物組：先一個字母一個字母念，再念整個名字。 */
+function sayWord(w, after) {
+  const slow = Math.max(0.45, settings.rate - 0.15);
+  if (spellMode()) {
+    say([
+      { text: w.en.split('').join(', '), lang: 'en-US', rate: 0.5, pause: 340 },
+      { text: w.en, lang: 'en-US', rate: slow, pause: 200 },
+      { text: w.en, lang: 'en-US' }
+    ], after);
+    return;
+  }
+  say([{ text: w.en, lang: 'en-US', rate: slow, pause: 320 }, { text: w.en, lang: 'en-US' }], after);
+}
+
+let actx = null;
+function beep(kind) {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const notes = kind === 'ok' ? [660, 880] : [330, 262];
+    notes.forEach((f, idx) => {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      const t = actx.currentTime + idx * 0.13;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t); o.stop(t + 0.24);
+    });
+  } catch (e) {}
+}
+let unlocked = false;
+function unlock() {
+  if (unlocked) return;
+  unlocked = true;
+  if (hasTTS) { try { speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); } catch (e) {} }
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {}
+}
+document.addEventListener('pointerdown', unlock, { once: true });
+
+/* ========================= 聽（語音辨識） ========================= */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let micMode = SR ? 'native' : 'none';
+let dictation = null, recog = null, listening = false, heardHandler = null, listenTimer = null;
+
+(async function initDictation() {
+  try {
+    if (window.claude && typeof window.claude.use === 'function') {
+      dictation = await window.claude.use('dictation');
+      if (dictation) {
+        dictation.onFinal(({ text }) => { log('聽-結果(dictation)', text); if (listening) finishListen([text]); });
+        if (micMode === 'none') micMode = 'dictation';
+        log('麥克風', 'Claude dictation 可用');
+      }
+    }
+  } catch (e) {}
+})();
+
+function micAvailable() { return settings.useMic && micMode !== 'none'; }
+
+function startListen(onHeard) {
+  if (!micAvailable()) return false;
+  heardHandler = onHeard;
+  listening = true;
+  clearTimeout(listenTimer);
+  log('聽-開始', { 模式: micMode, 目標字: (curWord() || {}).en, 階段: state.phase });
+  listenTimer = setTimeout(() => {
+    if (listening) { log('聽-逾時', '7 秒內沒收到結果'); stopListen(); finishListen([]); }
+  }, 7000);
+
+  if (micMode === 'native') {
+    try {
+      recog = new SR();
+      recog.lang = 'en-US';
+      recog.interimResults = false;
+      recog.maxAlternatives = 5;
+      recog.continuous = false;
+      recog.onaudiostart = () => log('聽-收音', '麥克風已開始收音');
+      recog.onspeechstart = () => log('聽-偵測到說話', '');
+      recog.onresult = ev => {
+        const out = [], detail = [];
+        for (let i = 0; i < ev.results.length; i++) {
+          const r = ev.results[i];
+          for (let j = 0; j < r.length; j++) {
+            out.push(r[j].transcript);
+            detail.push(r[j].transcript + '(' + (r[j].confidence != null ? r[j].confidence.toFixed(2) : '?') + ')');
+          }
+        }
+        log('聽-結果', detail.join(' | ') || '空的');
+        finishListen(out);
+      };
+      recog.onerror = ev => {
+        const code = ev && ev.error;
+        log('聽-錯誤', String(code));
+        if (code === 'not-allowed' || code === 'service-not-allowed') {
+          if (dictation) { micMode = 'dictation'; listening = false; startListen(onHeard); return; }
+          micMode = 'none'; listening = false; render();
+          toast('這裡不能用麥克風，改用按鈕模式');
+          return;
+        }
+        finishListen([]);
+      };
+      recog.onend = () => { if (listening) { log('聽-結束', '沒有任何辨識結果'); finishListen([]); } };
+      recog.start();
+      return true;
+    } catch (e) {
+      if (dictation) { micMode = 'dictation'; listening = false; return startListen(onHeard); }
+      micMode = 'none'; listening = false; render(); return false;
+    }
+  }
+  if (micMode === 'dictation') {
+    Promise.resolve(dictation.start()).catch(err => {
+      listening = false;
+      if (err && err.code === 'not_granted') { micMode = 'none'; toast('沒有麥克風權限，改用按鈕模式'); }
+      render();
+    });
+    return true;
+  }
+  return false;
+}
+function stopListen() {
+  clearTimeout(listenTimer);
+  try { if (micMode === 'native' && recog) recog.stop(); } catch (e) {}
+  try { if (micMode === 'dictation' && dictation) dictation.stop(); } catch (e) {}
+}
+function finishListen(list) {
+  if (!listening) return;
+  listening = false;
+  clearTimeout(listenTimer);
+  try { if (micMode === 'native' && recog) recog.abort(); } catch (e) {}
+  const fn = heardHandler; heardHandler = null;
+  if (fn) fn(list || []);
+}
+
+/* ---------- 判斷念得對不對 ---------- */
+function norm(s) { return (s || '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim(); }
+function lev(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    const curRow = [i];
+    for (let j = 1; j <= n; j++) curRow[j] = Math.min(prev[j] + 1, curRow[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = curRow;
+  }
+  return prev[n];
+}
+/** 判斷 + 留紀錄 */
+function judgeLog(list, w) {
+  const ok = judge(list, w, siblings());
+  log('判斷', { 目標: w.en, 聽到: list, 結果: ok ? '✔ 算對' : '✘ 算錯', 同組字: siblings().join('/') });
+  return ok;
+}
+
+/** heardList: 辨識出的幾種可能；sibs: 同組其他單字（gum / gun 不能互相放水） */
+function judge(heardList, word, sibs) {
+  const t = norm(word.en);
+  const others = sibs.map(norm).filter(s => s !== t);
+  const alts = (word.alt || []).map(norm);
+  for (const raw of heardList) {
+    const h = norm(raw);
+    if (!h) continue;
+    if (h === t) return true;
+    if (others.indexOf(h) > -1) continue;
+    // 他拼字母時，辨識結果會像 "j a c k" 或 "j a c k jack"
+    const hd = h.replace(/ /g, ''), td = t.replace(/ /g, '');
+    if (others.some(o => o.replace(/ /g, '') === hd)) continue;
+    if (hd === td || hd === td + td) return true;
+    if (alts.indexOf(h) > -1) return true;
+    const parts = h.split(' ');
+    if (t.indexOf(' ') > -1) {
+      if (h.indexOf(t) > -1) return true;
+      if (lev(h, t) <= 2) return true;
+    } else {
+      if (parts.indexOf(t) > -1) return true;
+      if (alts.some(a => parts.indexOf(a) > -1)) return true;
+      if (t.length >= 4) {
+        for (const p of parts) if (lev(p, t) <= 1 && !others.some(o => lev(p, o) <= 1)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/* ========================= 狀態 ========================= */
+const el = {
+  units: document.getElementById('units'),
+  sets: document.getElementById('sets'),
+  stars: document.getElementById('stars'),
+  roundTag: document.getElementById('roundTag'),
+  todayLine: document.getElementById('todayLine'),
+  statusbar: document.getElementById('statusbar'),
+  stage: document.getElementById('stage'),
+  btnQuiz: document.getElementById('btnQuiz'),
+  btnPics: document.getElementById('btnPics'),
+  btnParent: document.getElementById('btnParent'),
+  picInput: document.getElementById('picInput')
+};
+
+let state = {
+  setId: null,
+  mode: 'play',    // play | phase | done | quiz | parent
+  phase: 'pic',    // pic = 圖片面　text = 英文字面
+  step: 'ask',     // ask | listening | repeat | reveal
+  queue: [], pos: 0, tries: 0,
+  line: '', lineTone: '', heard: '',
+  quiz: null
+};
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function stopAll() { stopSpeech(); if (listening) { listening = false; stopListen(); } }
+
+/* ========================= 畫面 ========================= */
+function renderTabs() {
+  const pairs = activePairs();
+  const activeUnits = [];
+  pairs.forEach(p => { if (activeUnits.indexOf(p.u) === -1) activeUnits.push(p.u); });
+
+  el.units.innerHTML = '';
+  activeUnits.forEach(u => {
+    const b = document.createElement('button');
+    b.className = 'pill'; b.type = 'button';
+    b.setAttribute('aria-pressed', String(u === unit()));
+    b.textContent = u.name;
+    b.onclick = () => { stopAll(); state.setId = pairs.filter(p => p.u === u)[0].s.id; startRound(); };
+    el.units.appendChild(b);
+  });
+
+  el.sets.innerHTML = '';
+  pairs.filter(p => p.u === unit()).forEach(p => {
+    const pr = progress.sets[p.s.id];
+    const r = pr ? Math.min(pr.round - 1, settings.rounds) : 0;
+    const b = document.createElement('button');
+    b.className = 'pill'; b.type = 'button';
+    b.setAttribute('aria-pressed', String(p.s.id === cardSet().id));
+    b.textContent = p.s.name + (r >= settings.rounds ? ' ✔' : r > 0 ? ' ·'.repeat(r) : '');
+    b.onclick = () => { stopAll(); state.setId = p.s.id; startRound(); };
+    el.sets.appendChild(b);
+  });
+}
+
+function renderStatus() {
+  const s = cardSet();
+  const p = setProgress(s.id);
+  el.statusbar.hidden = (state.mode === 'parent');
+  el.roundTag.textContent = (p.round - 1) >= settings.rounds
+    ? '這組完成 ✔'
+    : '第 ' + p.round + ' / ' + settings.rounds + ' 輪 · ' + (state.phase === 'pic' ? '看圖片' : '看英文字');
+  el.stars.innerHTML = '';
+  s.words.forEach((_, i) => {
+    const sp = document.createElement('span');
+    sp.className = 'star' + (i < state.pos ? ' on' : '');
+    sp.textContent = '⭐';
+    el.stars.appendChild(sp);
+  });
+  const pairs = activePairs();
+  const done = pairs.filter(x => setDone(x.s.id)).length;
+  el.todayLine.textContent = '今天的功課：' + pairs.map(x => x.u.name + ' ' + x.s.name).join('、') +
+                             '　各 ' + settings.rounds + ' 次　(' + done + '/' + pairs.length + ' 組完成)';
+}
+
+function startRound() {
+  if (!state.setId) state.setId = activePairs()[0].s.id;
+  state.mode = 'play'; state.phase = 'pic'; state.step = 'ask'; state.pos = 0; state.tries = 0;
+  state.line = ''; state.lineTone = ''; state.heard = '';
+  state.queue = shuffle(cardSet().words);
+  render();
+  askCurrent();
+}
+
+function render() {
+  if (!state.setId) state.setId = activePairs()[0].s.id;
+  renderTabs();
+  renderStatus();
+  if (state.mode === 'parent') return renderParent();
+  if (state.mode === 'phase') return renderPhase();
+  if (state.mode === 'done') return renderDone();
+  if (state.mode === 'quiz') return renderQuiz();
+  renderCard();
+}
+
+/* ---------- 卡片 ---------- */
+function renderCard() {
+  const w = curWord();
+  if (!w) { el.stage.innerHTML = '<div class="sheet"><h2>這組還沒有單字</h2></div>'; return; }
+  const showBack = (state.step === 'reveal');
+  const picSide = (state.phase === 'pic');
+  el.stage.innerHTML = '';
+
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'card' + (showBack ? ' flipped' : '');
+  card.innerHTML =
+    '<div class="card-inner">' +
+      '<div class="face front">' + (picSide ? picHTML(w) : '<div class="textcard">' + w.en + '</div>') + '</div>' +
+      '<div class="face back">' +
+        (picSide ? '<div class="word">' + w.en + '</div>' : picHTML(w)) +
+        '<div class="zh">' + w.zh + '</div>' +
+      '</div>' +
+    '</div>';
+  card.onclick = () => { stopAll(); sayWord(w); };
+  el.stage.appendChild(card);
+
+  const count = document.createElement('div');
+  count.className = 'card-count';
+  count.textContent = (state.pos + 1) + ' / ' + state.queue.length + '　·　' + unit().name + ' ' + cardSet().name +
+                      '　·　' + (picSide ? '圖片面' : '英文字面');
+  el.stage.appendChild(count);
+
+  const zone = document.createElement('div');
+  zone.className = 'mic-zone';
+  const line = document.createElement('div');
+  line.className = 'say-line' + (state.lineTone ? ' ' + state.lineTone : '');
+  line.textContent = state.line;
+  zone.appendChild(line);
+
+  if (state.step !== 'reveal' && micAvailable()) {
+    const mic = document.createElement('button');
+    mic.type = 'button';
+    mic.className = 'mic' + (state.step === 'listening' ? ' live' : '');
+    mic.textContent = state.step === 'listening' ? '👂' : '🎤';
+    mic.setAttribute('aria-label', state.step === 'listening' ? '正在聽' : '按一下開始說');
+    mic.onclick = () => { if (state.step === 'listening') stopListen(); else listenNow(); };
+    zone.appendChild(mic);
+    const heard = document.createElement('div');
+    heard.className = 'heard';
+    heard.textContent = state.heard ? '（聽到：' + state.heard + '）' : '';
+    zone.appendChild(heard);
+  }
+  el.stage.appendChild(zone);
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  if (state.step === 'reveal') {
+    actions.innerHTML =
+      '<button class="b-listen" type="button">🔊<span class="b-sub">再聽一次</span></button>' +
+      '<button class="b-got" type="button">▶<span class="b-sub">下一張</span></button>';
+    actions.children[0].onclick = () => sayWord(w);
+    actions.children[1].onclick = () => nextCard();
+  } else {
+    actions.innerHTML =
+      '<button class="b-listen" type="button">🔊<span class="b-sub">念給我聽</span></button>' +
+      '<button class="b-again" type="button">↻<span class="b-sub">不會，跳過</span></button>' +
+      '<button class="b-got" type="button">✓<span class="b-sub">他念對了</span></button>';
+    actions.children[0].onclick = () => { stopAll(); state.tries = 0; coachRepeat(); };
+    actions.children[1].onclick = () => { markShaky(w); stopAll(); reveal('沒關係，我們下次再練'); };
+    actions.children[2].onclick = () => { stopAll(); succeed(w); };
+  }
+  el.stage.appendChild(actions);
+}
+
+function markShaky(w) {
+  const p = setProgress(cardSet().id);
+  if (p.shaky.indexOf(w.en) === -1) p.shaky.push(w.en);
+  save();
+}
+
+function askCurrent() {
+  const w = curWord();
+  if (!w) return;
+  state.step = 'ask'; state.heard = ''; state.lineTone = '';
+  const pic = (state.phase === 'pic');
+  const sp = spellMode();
+  state.line = sp
+    ? (pic ? '先拼出字母，再念名字' : '先拼字母，再念一次')
+    : (pic ? '看圖片，用英文說說看' : '這個字怎麼念？');
+  render();
+  if (!settings.zhHints) return;
+  const base = sp
+    ? (pic ? '看這張圖，先一個字母一個字母拼出來，再念整個名字。' : '先把字母拼出來，再念整個名字。')
+    : (pic ? '看這張圖，用英文說說看。' : '這個字怎麼念？念念看。');
+  zh(base + (micAvailable() ? '準備好就按下面的麥克風。' : ''));
+}
+
+function listenNow() {
+  const w = curWord();
+  stopSpeech();
+  state.step = 'listening';
+  state.line = '我在聽……大聲說一次';
+  state.lineTone = ''; state.heard = '';
+  render();
+  if (!startListen(list => handleHeard(list, w))) { state.step = 'ask'; render(); }
+}
+
+function handleHeard(list, w) {
+  state.heard = (list[0] || '').trim();
+  if (judgeLog(list, w)) { succeed(w); return; }
+  state.tries++;
+  if (list.length === 0 || state.tries >= MAX_TRIES) { log('流程', '轉成複誦模式（我念一次、他跟著念）'); coachRepeat(); return; }
+  state.step = 'ask';
+  state.line = '再試一次看看';
+  state.lineTone = 'oops';
+  beep('no');
+  render();
+  zh('再試一次看看。');
+}
+
+/** 複誦模式：AI 念一次 → 叫他跟著念 → 再聽一次 */
+function coachRepeat() {
+  const w = curWord();
+  state.step = 'repeat';
+  state.line = (spellMode() ? '聽我拼：' : '聽我念：') + w.en;
+  state.lineTone = '';
+  render();
+  sayWord(w, () => {
+    zh(spellMode() ? '換你拼拼看，再念一次。' : '換你念念看。', () => {
+      if (!micAvailable()) { state.line = '跟著念一次：' + w.en; render(); return; }
+      state.step = 'listening';
+      state.line = '換你念：' + w.en;
+      render();
+      startListen(list => {
+        state.heard = (list[0] || '').trim();
+        if (judgeLog(list, w)) { succeed(w, true); return; }
+        log('流程', '複誦後還是沒過，標記為不熟：' + w.en);
+        markShaky(w);
+        beep('no');
+        reveal('沒關係，這個字我們多練幾次');
+      });
+    });
+  });
+}
+
+function succeed(w, afterCoach) {
+  beep('ok');
+  state.step = 'reveal';
+  state.line = afterCoach ? '很棒！跟著念對了' : '答對了！';
+  state.lineTone = 'good';
+  render();
+  say([
+    { text: 'Yes! ' + w.en, lang: 'en-US', pause: 200 },
+    { text: afterCoach ? '很棒，跟著念對了。' : '答對了！', lang: 'zh-TW', pause: 150 }
+  ], () => sayWord(w, () => setTimeout(() => { if (state.step === 'reveal' && state.mode === 'play') nextCard(); }, 900)));
+}
+
+function reveal(msg) {
+  const w = curWord();
+  state.step = 'reveal';
+  state.line = msg || '';
+  state.lineTone = '';
+  render();
+  sayWord(w);
+}
+
+function nextCard() {
+  stopAll();
+  state.pos++; state.tries = 0; state.heard = '';
+  if (state.pos >= state.queue.length) {
+    if (state.phase === 'pic') { state.mode = 'phase'; render(); return; }
+    const p = setProgress(cardSet().id);
+    p.round++;
+    save();
+    state.mode = 'done';
+    render();
+    return;
+  }
+  askCurrent();
+}
+
+/** 中場：圖片面念完了，翻到英文字面 */
+function renderPhase() {
+  el.stage.innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'done-box';
+  box.innerHTML =
+    '<div class="trophy">🔄</div>' +
+    '<div class="done-title">圖片都念完了！<br>現在翻到背面看英文字</div>' +
+    '<div class="note">一樣直接念出整個單字就好</div>';
+  el.stage.appendChild(box);
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  actions.innerHTML = '<button class="b-got b-wide" type="button">▶ 翻到背面<span class="b-sub">' + cardSet().name + '　' + cardSet().words.length + ' 張</span></button>';
+  actions.firstChild.onclick = () => {
+    state.mode = 'play'; state.phase = 'text'; state.pos = 0; state.tries = 0;
+    state.queue = shuffle(cardSet().words);
+    askCurrent();
+  };
+  el.stage.appendChild(actions);
+  beep('ok');
+  zh('圖片都念完了，現在翻到背面看英文字。');
+}
+
+/* ---------- 完成 ---------- */
+function renderDone() {
+  const s = cardSet();
+  const p = setProgress(s.id);
+  const thisSetDone = (p.round - 1) >= settings.rounds;
+  const everything = thisSetDone && allSetsDone();
+  confetti(); beep('ok');
+
+  el.stage.innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'done-box';
+  box.innerHTML =
+    '<div class="trophy">' + (everything ? '🏆' : thisSetDone ? '🎉' : '👏') + '</div>' +
+    '<div class="done-title">' +
+      (everything ? '今天的字卡功課<br>全部完成了！可以找媽媽簽名'
+        : thisSetDone ? s.name + ' ' + settings.rounds + ' 次都完成了！'
+        : s.name + ' 第 ' + (p.round - 1) + ' 次完成！') +
+    '</div>' +
+    (p.shaky.length
+      ? '<div class="chiplist">' + p.shaky.map(x => '<span class="chip warn">' + x + '</span>').join('') + '</div><div class="note">這幾個字還要再練一下</div>'
+      : '<div class="note">全部都很會，太棒了！</div>');
+  el.stage.appendChild(box);
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  const pairs = activePairs();
+  const idx = pairs.map(x => x.s.id).indexOf(s.id);
+  const nextUndone = pairs.slice(idx + 1).concat(pairs.slice(0, idx)).filter(x => !setDone(x.s.id))[0];
+
+  if (!thisSetDone) {
+    actions.innerHTML = '<button class="b-got b-wide" type="button">▶ 開始第 ' + p.round + ' 次<span class="b-sub">' + s.name + '</span></button>';
+    actions.firstChild.onclick = startRound;
+  } else {
+    const btns = [];
+    if (nextUndone) btns.push('<button class="b-got" type="button">▶<span class="b-sub">下一組：' + nextUndone.s.name + '</span></button>');
+    btns.push('<button class="b-listen" type="button">🎧<span class="b-sub">考考我</span></button>');
+    btns.push('<button class="b-again" type="button">↻<span class="b-sub">再玩一次</span></button>');
+    actions.innerHTML = btns.join('');
+    let i = 0;
+    if (nextUndone) actions.children[i++].onclick = () => { state.setId = nextUndone.s.id; startRound(); };
+    actions.children[i++].onclick = startQuiz;
+    actions.children[i].onclick = () => { p.round = 1; p.shaky = []; save(); startRound(); };
+  }
+  el.stage.appendChild(actions);
+
+  zh(everything ? '太棒了，今天的字卡功課全部完成，去找媽媽簽名。'
+    : thisSetDone ? '這一組完成了！' : '完成一次了，再來一次。');
+}
+
+function confetti() {
+  const box = document.createElement('div');
+  box.className = 'confetti';
+  const colors = ['#2E9E5B', '#F2A91B', '#E4654A', '#4FD17F', '#F7C560'];
+  for (let i = 0; i < 28; i++) {
+    const s = document.createElement('i');
+    s.style.left = Math.random() * 100 + '%';
+    s.style.background = colors[i % colors.length];
+    s.style.animationDuration = (1.6 + Math.random() * 1.4) + 's';
+    s.style.animationDelay = (Math.random() * 0.5) + 's';
+    box.appendChild(s);
+  }
+  document.body.appendChild(box);
+  setTimeout(() => box.remove(), 3600);
+}
+
+/* ---------- 考考我：聽英文、選圖 ---------- */
+function startQuiz() {
+  stopAll();
+  const words = cardSet().words;
+  if (words.length < 3) { toast('這組字太少，先練翻卡吧'); return; }
+  state.mode = 'quiz'; state.pos = 0;
+  state.queue = shuffle(words);
+  newQuizQuestion();
+}
+function newQuizQuestion() {
+  const words = cardSet().words;
+  const answer = state.queue[state.pos % state.queue.length];
+  const others = shuffle(words.filter(w => w.en !== answer.en)).slice(0, 2);
+  state.quiz = { answer: answer, choices: shuffle([answer].concat(others)), locked: false };
+  render();
+}
+/** 用中文問、單字用英文念 —— 他還聽不懂 Where is */
+function askWhich(w, after) {
+  say([
+    { text: '哪個是', lang: 'zh-TW', pause: 100 },
+    { text: w.en, lang: 'en-US', pause: 120 },
+    { text: '呢？', lang: 'zh-TW' }
+  ], after);
+}
+
+function renderQuiz() {
+  const q = state.quiz;
+  el.stage.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'say-line';
+  head.innerHTML = '哪個是 <span class="qword">' + q.answer.en + '</span>？';
+  el.stage.appendChild(head);
+
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:10px;';
+  q.choices.forEach(c => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.style.cssText = 'border:3px solid var(--line);background:var(--surface);border-radius:22px;aspect-ratio:1;font-size:clamp(34px,11vw,60px);display:grid;place-items:center;box-shadow:var(--shadow);overflow:hidden;padding:6px;';
+    b.innerHTML = picHTML(c);
+    b.onclick = () => {
+      if (q.locked) return;
+      if (c.en === q.answer.en) {
+        q.locked = true;
+        b.style.borderColor = 'var(--accent)'; b.style.background = 'var(--accent-soft)';
+        beep('ok');
+        say([{ text: 'Yes! ' + q.answer.en, lang: 'en-US', pause: 200 }, { text: '答對了！', lang: 'zh-TW' }], () => {
+          state.pos++;
+          if (state.pos >= state.queue.length) { toast('考完囉，回到翻卡'); startRound(); }
+          else newQuizQuestion();
+        });
+      } else {
+        b.style.borderColor = 'var(--coral)'; b.style.opacity = '.5';
+        beep('no');
+        markShaky(q.answer);
+        say([{ text: '再試一次', lang: 'zh-TW', pause: 180 }, { text: q.answer.en, lang: 'en-US' }]);
+      }
+    };
+    grid.appendChild(b);
+  });
+  el.stage.appendChild(grid);
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  actions.innerHTML =
+    '<button class="b-listen" type="button">🔊<span class="b-sub">再念一次</span></button>' +
+    '<button class="b-got" type="button">🃏<span class="b-sub">回去翻卡</span></button>';
+  actions.children[0].onclick = () => askWhich(q.answer);
+  actions.children[1].onclick = () => startRound();
+  el.stage.appendChild(actions);
+
+  askWhich(q.answer);
+}
+
+/* ---------- 家長頁 ---------- */
+let pendingPicKey = null;
+let pendingPicLabel = '';
+el.picInput.onchange = () => {
+  const f = el.picInput.files && el.picInput.files[0];
+  const key = pendingPicKey;
+  el.picInput.value = '';
+  if (!f || !key) return;
+  openCropper(f, key, pendingPicLabel);
+};
+
+/** 一張照片裡有一整組卡片時，用這個框出要的那一張 */
+function openCropper(file, key, label) {
+  const fr = new FileReader();
+  fr.onerror = () => toast('這張圖讀不進來，換一張試試');
+  fr.onload = () => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal';
+    overlay.innerHTML =
+      '<div class="modal-title">框出「' + label + '」那一張卡</div>' +
+      '<div class="modal-hint">拖動白框移動、拉右下角的圓點調大小。整張照片只有一張卡的話，直接按「整張都要」。</div>' +
+      '<div class="cropwrap"><img alt=""><div class="cropbox"><div class="handle"></div></div></div>' +
+      '<div class="modal-ops">' +
+        '<button class="mini" type="button" data-act="full">整張都要</button>' +
+        '<button class="mini" type="button" data-act="cancel">取消</button>' +
+        '<button class="mini ok" type="button" data-act="ok">✓ 就是這塊</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    const img = overlay.querySelector('img');
+    const box = overlay.querySelector('.cropbox');
+    const handle = overlay.querySelector('.handle');
+    let rect = { x: 0, y: 0, w: 0, h: 0 };
+    const apply = () => {
+      box.style.left = rect.x + 'px'; box.style.top = rect.y + 'px';
+      box.style.width = rect.w + 'px'; box.style.height = rect.h + 'px';
+    };
+    img.onload = () => {
+      const W = img.clientWidth, H = img.clientHeight;
+      const s = Math.min(W, H) * 0.7;
+      rect = { x: (W - s) / 2, y: (H - s) / 2, w: s, h: s };
+      apply();
+    };
+    img.src = fr.result;
+
+    let mode = null, sx = 0, sy = 0, orig = null;
+    const onMove = e => {
+      if (!mode) return;
+      const W = img.clientWidth, H = img.clientHeight;
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      if (mode === 'move') {
+        rect.x = Math.min(Math.max(0, orig.x + dx), Math.max(0, W - rect.w));
+        rect.y = Math.min(Math.max(0, orig.y + dy), Math.max(0, H - rect.h));
+      } else {
+        let s = Math.max(40, orig.w + Math.max(dx, dy));
+        s = Math.min(s, W - rect.x, H - rect.y);
+        rect.w = s; rect.h = s;
+      }
+      apply();
+      e.preventDefault();
+    };
+    const onUp = () => {
+      mode = null;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    const grab = (m) => (e) => {
+      mode = m; sx = e.clientX; sy = e.clientY; orig = { x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+      window.addEventListener('pointermove', onMove, { passive: false });
+      window.addEventListener('pointerup', onUp);
+      e.preventDefault(); e.stopPropagation();
+    };
+    box.addEventListener('pointerdown', grab('move'));
+    handle.addEventListener('pointerdown', grab('size'));
+
+    const close = () => { onUp(); overlay.remove(); };
+    const crop = (full) => {
+      const kx = img.naturalWidth / (img.clientWidth || 1);
+      const ky = img.naturalHeight / (img.clientHeight || 1);
+      const sx0 = full ? 0 : rect.x * kx;
+      const sy0 = full ? 0 : rect.y * ky;
+      const sw = full ? img.naturalWidth : Math.max(1, rect.w * kx);
+      const sh = full ? img.naturalHeight : Math.max(1, rect.h * ky);
+      const scale = Math.min(1, 640 / Math.max(sw, sh));
+      const cw = Math.max(1, Math.round(sw * scale)), ch = Math.max(1, Math.round(sh * scale));
+      try {
+        const c = document.createElement('canvas');
+        c.width = cw; c.height = ch;
+        c.getContext('2d').drawImage(img, sx0, sy0, sw, sh, 0, 0, cw, ch);
+        savePic(key, c.toDataURL('image/jpeg', 0.85));
+        close();
+        toast('圖片換好了');
+        if (state.mode === 'parent') renderParent();
+      } catch (e) { close(); toast('這張圖處理不了，換一張試試'); }
+    };
+    overlay.querySelectorAll('[data-act]').forEach(b => {
+      b.onclick = () => {
+        const a = b.getAttribute('data-act');
+        if (a === 'cancel') close();
+        else crop(a === 'full');
+      };
+    });
+  };
+  fr.readAsDataURL(file);
+}
+
+function renderParent() {
+  stopAll();
+  el.stage.innerHTML = '';
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet';
+  el.stage.appendChild(sheet);
+
+  const add = (tag, cls, html) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (html != null) n.innerHTML = html;
+    sheet.appendChild(n);
+    return n;
+  };
+
+  /* --- 今天的範圍 --- */
+  add('div', 'row', '<h2>今天的功課範圍</h2>');
+  add('p', 'note', '聯絡簿寫 U4–6 就全部勾起來；只練 U4 就只勾 U4。沒勾到的組，哥哥的畫面上不會出現。');
+
+  UNITS.forEach(u => {
+    const box = add('div', 'scope-unit', '');
+    const head = document.createElement('div');
+    head.className = 'scope-head';
+    const allOn = u.sets.every(s => settings.activeSets.indexOf(s.id) > -1);
+    head.innerHTML = '<strong>' + u.name + '</strong>';
+    const tog = document.createElement('button');
+    tog.className = 'mini'; tog.type = 'button';
+    tog.textContent = allOn ? '整個取消' : '整個勾選';
+    tog.onclick = () => {
+      u.sets.forEach(s => {
+        const i = settings.activeSets.indexOf(s.id);
+        if (allOn) { if (i > -1) settings.activeSets.splice(i, 1); }
+        else if (i === -1) settings.activeSets.push(s.id);
+      });
+      if (!settings.activeSets.length) settings.activeSets = [u.sets[0].id];
+      save(); state.setId = activePairs()[0].s.id; renderParent(); renderTabs();
+    };
+    head.appendChild(tog);
+    box.appendChild(head);
+
+    const row = document.createElement('div');
+    row.className = 'scope-sets';
+    u.sets.forEach(s => {
+      const b = document.createElement('button');
+      b.className = 'pill'; b.type = 'button';
+      const on = settings.activeSets.indexOf(s.id) > -1;
+      b.setAttribute('aria-pressed', String(on));
+      b.textContent = (on ? '✓ ' : '') + s.name + '（' + s.words.length + '）';
+      b.onclick = () => {
+        const i = settings.activeSets.indexOf(s.id);
+        if (i > -1) settings.activeSets.splice(i, 1); else settings.activeSets.push(s.id);
+        if (!settings.activeSets.length) settings.activeSets.push(s.id);
+        save(); state.setId = activePairs()[0].s.id; renderParent(); renderTabs();
+      };
+      row.appendChild(b);
+    });
+    box.appendChild(row);
+  });
+
+  const rRow = add('div', 'row', '<strong>每組要練幾次</strong>');
+  const rWrap = document.createElement('div');
+  rWrap.className = 'rounds';
+  [1, 2, 3].forEach(n => {
+    const b = document.createElement('button');
+    b.className = 'pill'; b.type = 'button';
+    b.setAttribute('aria-pressed', String(settings.rounds === n));
+    b.textContent = n + ' 次';
+    b.onclick = () => { settings.rounds = n; save(); renderParent(); renderStatus(); renderTabs(); };
+    rWrap.appendChild(b);
+  });
+  rRow.appendChild(rWrap);
+
+  /* --- 字卡圖片 --- */
+  add('h3', null, '字卡圖片');
+  add('p', 'note',
+    '<strong>方法一（電腦，推薦）：</strong>把圖檔丟進 <code>flashcards/img/</code> 資料夾，檔名用單字本身 —— <code>gift.jpg</code>、<code>good-morning.jpg</code>。重整網頁就會自動抓。<br>' +
+    '<strong>方法二（平板）：</strong>點下面任何一格，直接拍照或從相簿選。這種只存在這台裝置。<br>' +
+    '一張卡拍一張，不要整排一起拍。兩種都有的話，以拍照的為準（按 🗑 清掉就會換回資料夾裡那張）。');
+  allPairs().forEach(p => {
+    const got = p.s.words.filter(w => picSrc(w)).length;
+    add('p', 'note', '<strong>' + p.u.name + ' · ' + p.s.name + '</strong>　' + got + ' / ' + p.s.words.length + ' 張已換成真實圖卡');
+    const grid = add('div', 'picgrid', '');
+    p.s.words.forEach(w => {
+      const cell = document.createElement('div');
+      cell.className = 'piccell';
+      const box = document.createElement('button');
+      box.type = 'button';
+      box.className = 'box';
+      box.innerHTML = picSrc(w) ? '<img src="' + picSrc(w) + '" alt="">' : w.pic;
+      const choose = () => { pendingPicKey = w._key; pendingPicLabel = w.en + '（' + w.zh + '）'; el.picInput.click(); };
+      box.onclick = choose;
+      cell.appendChild(box);
+      const nm = document.createElement('div');
+      nm.className = 'nm'; nm.textContent = w.en;
+      cell.appendChild(nm);
+      const ops = document.createElement('div');
+      ops.className = 'ops';
+      const bCam = document.createElement('button');
+      bCam.type = 'button'; bCam.textContent = '📷'; bCam.title = '選照片、框出這張卡';
+      bCam.onclick = choose;
+      ops.appendChild(bCam);
+      if (pics.get(w._key)) {
+        const a = document.createElement('a');
+        a.textContent = '⬇';
+        a.title = '下載成 ' + slug(w) + '.jpg，可以丟進 img/ 資料夾跟著專案上傳';
+        a.href = pics.get(w._key);
+        a.download = slug(w) + '.jpg';
+        ops.appendChild(a);
+        const bDel = document.createElement('button');
+        bDel.type = 'button'; bDel.textContent = '🗑'; bDel.title = '清掉，回到預設圖示';
+        bDel.onclick = () => { delPic(w._key); renderParent(); };
+        ops.appendChild(bDel);
+      }
+      cell.appendChild(ops);
+      grid.appendChild(cell);
+    });
+  });
+
+  /* --- 今天的紀錄 --- */
+  add('h3', null, '今天的練習紀錄　' + progress.date);
+  const rows = [];
+  activePairs().forEach(p => {
+    const pr = progress.sets[p.s.id];
+    rows.push({ title: p.u.name + ' · ' + p.s.name, rounds: pr ? Math.min(pr.round - 1, settings.rounds) : 0, shaky: (pr && pr.shaky) || [] });
+  });
+  rows.forEach(r => {
+    add('div', null,
+      '<h3>' + r.title + '　' + r.rounds + ' / ' + settings.rounds + ' 次</h3>' +
+      (r.shaky.length
+        ? '<div class="chiplist">' + r.shaky.map(x => '<span class="chip warn">' + x + '</span>').join('') + '</div>'
+        : '<div class="chiplist"><span class="chip">' + (r.rounds ? '都很熟' : '還沒練') + '</span></div>'));
+  });
+
+  add('h3', null, '寫給 Tr. Robyn 的話');
+  const ta = document.createElement('textarea');
+  ta.className = 'report'; ta.id = 'reportText';
+  const shakyAll = rows.reduce((acc, r) => acc.concat(r.shaky), []);
+  const doneAll = rows.filter(r => r.rounds >= settings.rounds).map(r => r.title).join('、');
+  ta.value = '字卡複習：' + (doneAll ? doneAll + ' 各 ' + settings.rounds + ' 次已完成。' : '今天尚未完成。') +
+    (shakyAll.length ? '\n在家比較不熟的字：' + shakyAll.join(', ') + '，麻煩老師上課時多帶一下，謝謝！'
+                     : '\n在家複習都很順利，謝謝老師！');
+  sheet.appendChild(ta);
+
+  const row1 = add('div', 'row',
+    '<button class="mini" type="button" id="btnCopy">📋 複製這段話</button>' +
+    '<button class="mini danger" type="button" id="btnReset">清掉今天的紀錄</button>');
+
+  /* --- 設定 --- */
+  add('h3', null, '設定');
+  const rowMic = add('div', 'row', '<label for="useMic">用麥克風聽他念得對不對</label>');
+  const cbMic = document.createElement('input');
+  cbMic.type = 'checkbox'; cbMic.id = 'useMic'; cbMic.checked = settings.useMic;
+  cbMic.disabled = (micMode === 'none');
+  cbMic.onchange = () => { settings.useMic = cbMic.checked; save(); };
+  rowMic.appendChild(cbMic);
+
+  const rowRate = add('div', 'row', '<label for="rate">英文語速</label>');
+  const range = document.createElement('input');
+  range.type = 'range'; range.id = 'rate';
+  range.min = '0.5'; range.max = '1.1'; range.step = '0.05'; range.value = String(settings.rate);
+  range.oninput = () => { settings.rate = parseFloat(range.value); save(); };
+  range.onchange = () => say([{ text: 'gift', lang: 'en-US' }]);
+  rowRate.appendChild(range);
+
+  const rowZh = add('div', 'row', '<label for="zhHints">用中文語音帶他（他還看不懂字）</label>');
+  const cbZh = document.createElement('input');
+  cbZh.type = 'checkbox'; cbZh.id = 'zhHints'; cbZh.checked = settings.zhHints;
+  cbZh.onchange = () => { settings.zhHints = cbZh.checked; save(); };
+  rowZh.appendChild(cbZh);
+
+  add('p', 'note',
+    '麥克風狀態：' + (micMode === 'native' ? '瀏覽器語音辨識' : micMode === 'dictation' ? 'Claude 語音輸入（備用）' : '不支援 —— 網址要是 https 或 localhost 才給麥克風') + '。<br>' +
+    '辨識對小朋友的發音本來就不會百分之百準，念兩次還是過不了會自動變成「我念一次、他跟著念」，不會卡住他。真的誤判就按「✓ 他念對了」。');
+
+  /* --- 測試紀錄 --- */
+  add('h3', null, '測試紀錄');
+  add('p', 'note',
+    '手機上看不到瀏覽器的錯誤訊息，所以這裡自己留了一份。<br>' +
+    '測完語音之後按「複製全部」，整份貼給 Claude，它就知道麥克風有沒有收到音、聽成什麼、為什麼判錯。');
+  const logPre = document.createElement('pre');
+  logPre.className = 'logbox';
+  logPre.id = 'logBox';
+  logPre.textContent = logText();
+  sheet.appendChild(logPre);
+  const logRow = add('div', 'row',
+    '<button class="mini" type="button" id="btnLogCopy">📋 複製全部（' + LOG.length + ' 筆）</button>' +
+    '<button class="mini" type="button" id="btnLogRefresh">↻ 更新</button>' +
+    '<button class="mini danger" type="button" id="btnLogClear">清空</button>');
+  logRow.querySelector('#btnLogCopy').onclick = async () => {
+    const txt = logText();
+    try { await navigator.clipboard.writeText(txt); toast('紀錄複製好了，貼給 Claude'); }
+    catch (e) {
+      logPre.textContent = txt;
+      const r = document.createRange(); r.selectNodeContents(logPre);
+      const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      toast('請長按選取複製');
+    }
+  };
+  logRow.querySelector('#btnLogRefresh').onclick = () => { logPre.textContent = logText(); logPre.scrollTop = logPre.scrollHeight; };
+  logRow.querySelector('#btnLogClear').onclick = () => { LOG.length = 0; log('紀錄', '已清空'); logPre.textContent = logText(); };
+  logPre.scrollTop = logPre.scrollHeight;
+
+  const back = document.createElement('div');
+  back.className = 'actions';
+  back.innerHTML = '<button class="b-got b-wide" type="button">← 回去練習</button>';
+  back.firstChild.onclick = () => { state.mode = 'play'; startRound(); };
+  el.stage.appendChild(back);
+
+  row1.querySelector('#btnCopy').onclick = async () => {
+    try { await navigator.clipboard.writeText(ta.value); toast('複製好了'); }
+    catch (e) { ta.select(); toast('請長按選取複製'); }
+  };
+  row1.querySelector('#btnReset').onclick = () => {
+    progress = { date: today(), sets: {} };
+    save(); toast('今天的紀錄清掉了'); renderParent(); renderStatus(); renderTabs();
+  };
+}
+
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 1900);
+}
+
+/* ========================= 啟動 ========================= */
+el.btnQuiz.onclick = () => startQuiz();
+el.btnParent.onclick = () => { stopAll(); state.mode = 'parent'; render(); };
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopAll(); });
+
+load();
+state.setId = activePairs()[0].s.id;
+log('啟動', {
+  安全來源: window.isSecureContext ? '是' : '否（麥克風不會動）',
+  辨識API: SR ? '有 webkitSpeechRecognition' : '沒有',
+  麥克風模式: micMode,
+  語音合成: hasTTS ? '有' : '無',
+  今天範圍: settings.activeSets.length + ' 組，各 ' + settings.rounds + ' 次'
+});
+setTimeout(() => { if (!voicesLogged) { voicesLogged = true; logVoices(); } }, 800);
+startRound();
+Promise.all([loadPics(), loadFilePics()]).then(() => {
+  log('圖片', '拍照上傳 ' + pics.size + ' 張、img 資料夾 ' + filePics.size + ' 張');
+  render();
+});
+</script>
+</body>
+</html>

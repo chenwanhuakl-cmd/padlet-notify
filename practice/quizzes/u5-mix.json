@@ -1,0 +1,180 @@
+{
+  "id": "u5-mix",
+  "title": "Unit 5 綜合練習",
+  "subject": "Unit 5 · 數字、I / J 自然發音",
+  "source": "依字卡自動產生",
+  "emoji": "🔢",
+  "questions": [
+    {
+      "ask": "pic",
+      "opt": "text",
+      "tag": "看圖選字",
+      "word": "jam",
+      "choices": [
+        "jet",
+        "jump",
+        "jam"
+      ],
+      "answer": 2
+    },
+    {
+      "ask": "listen",
+      "opt": "text",
+      "tag": "聽音選字",
+      "word": "igloo",
+      "choices": [
+        "insect",
+        "Indian",
+        "igloo"
+      ],
+      "answer": 2
+    },
+    {
+      "ask": "word",
+      "opt": "pic",
+      "tag": "看字選圖",
+      "word": "nine",
+      "choices": [
+        "seven",
+        "nine",
+        "eight"
+      ],
+      "answer": 1
+    },
+    {
+      "ask": "blank",
+      "opt": "letter",
+      "tag": "拼拼看",
+      "word": "ten",
+      "show": "t_n",
+      "choices": [
+        "e",
+        "a",
+        "i"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "pic",
+      "opt": "text",
+      "tag": "看圖選字",
+      "word": "twelve",
+      "choices": [
+        "twelve",
+        "eight",
+        "nine"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "listen",
+      "opt": "text",
+      "tag": "聽音選字",
+      "word": "eight",
+      "choices": [
+        "seven",
+        "eleven",
+        "eight"
+      ],
+      "answer": 2
+    },
+    {
+      "ask": "word",
+      "opt": "pic",
+      "tag": "看字選圖",
+      "word": "jet",
+      "choices": [
+        "jet",
+        "jar",
+        "jump"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "blank",
+      "opt": "letter",
+      "tag": "拼拼看",
+      "word": "Indian",
+      "show": "_ndian",
+      "choices": [
+        "h",
+        "I",
+        "j"
+      ],
+      "answer": 1
+    },
+    {
+      "ask": "pic",
+      "opt": "text",
+      "tag": "看圖選字",
+      "word": "ink",
+      "choices": [
+        "insect",
+        "ink",
+        "igloo"
+      ],
+      "answer": 1
+    },
+    {
+      "ask": "listen",
+      "opt": "text",
+      "tag": "聽音選字",
+      "word": "jump",
+      "choices": [
+        "jump",
+        "jam",
+        "jet"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "word",
+      "opt": "pic",
+      "tag": "看字選圖",
+      "word": "eleven",
+      "choices": [
+        "seven",
+        "ten",
+        "eleven"
+      ],
+      "answer": 2
+    },
+    {
+      "ask": "blank",
+      "opt": "letter",
+      "tag": "拼拼看",
+      "word": "insect",
+      "show": "_nsect",
+      "choices": [
+        "i",
+        "g",
+        "j"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "pic",
+      "opt": "text",
+      "tag": "看圖選字",
+      "word": "seven",
+      "choices": [
+        "seven",
+        "eleven",
+        "nine"
+      ],
+      "answer": 0
+    },
+    {
+      "ask": "listen",
+      "opt": "text",
+      "tag": "聽音選字",
+      "word": "jar",
+      "choices": [
+        "jar",
+        "jam",
+        "jet"
+      ],
+      "answer": 0
+    }
+  ]
+}
