@@ -201,6 +201,7 @@
     <div class="units" id="units"></div>
     <button class="icon-btn" id="btnQuiz" title="考考我">🎧</button>
     <button class="icon-btn" id="btnPics" title="上傳字卡圖片">📷</button>
+    <button class="icon-btn" id="btnLog" title="測試紀錄">🐞</button>
     <button class="icon-btn" id="btnParent" title="家長設定">👩</button>
   </div>
   <div class="sets" id="sets"></div>
@@ -554,7 +555,7 @@ document.addEventListener('pointerdown', unlock, { once: true });
 /* ========================= 聽（語音辨識） ========================= */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let micMode = SR ? 'native' : 'none';
-let dictation = null, recog = null, listening = false, heardHandler = null, listenTimer = null;
+let dictation = null, recog = null, listening = false, heardHandler = null, listenTimer = null, lastInterim = '';
 
 (async function initDictation() {
   try {
@@ -583,22 +584,34 @@ function startListen(onHeard) {
 
   if (micMode === 'native') {
     try {
+      // 上一輪如果還沒收乾淨，新的一輪會立刻結束（log 裡那些「0 秒就沒結果」）
+      try {
+        if (recog) { recog.onresult = recog.onerror = recog.onend = recog.onaudiostart = recog.onspeechstart = null; recog.abort(); }
+      } catch (e) {}
+      lastInterim = '';
       recog = new SR();
       recog.lang = 'en-US';
-      recog.interimResults = false;
+      recog.interimResults = true;   // 收中途的猜測，最終結果沒出來時拿它頂著
       recog.maxAlternatives = 5;
       recog.continuous = false;
       recog.onaudiostart = () => log('聽-收音', '麥克風已開始收音');
       recog.onspeechstart = () => log('聽-偵測到說話', '');
       recog.onresult = ev => {
         const out = [], detail = [];
+        let gotFinal = false;
         for (let i = 0; i < ev.results.length; i++) {
           const r = ev.results[i];
-          for (let j = 0; j < r.length; j++) {
-            out.push(r[j].transcript);
-            detail.push(r[j].transcript + '(' + (r[j].confidence != null ? r[j].confidence.toFixed(2) : '?') + ')');
+          if (r.isFinal) {
+            gotFinal = true;
+            for (let j = 0; j < r.length; j++) {
+              out.push(r[j].transcript);
+              detail.push(r[j].transcript + '(' + (r[j].confidence != null ? r[j].confidence.toFixed(2) : '?') + ')');
+            }
+          } else if (r[0] && r[0].transcript) {
+            lastInterim = r[0].transcript;
           }
         }
+        if (!gotFinal) return;          // 還在猜，等最終結果
         log('聽-結果', detail.join(' | ') || '空的');
         finishListen(out);
       };
@@ -613,8 +626,18 @@ function startListen(onHeard) {
         }
         finishListen([]);
       };
-      recog.onend = () => { if (listening) { log('聽-結束', '沒有任何辨識結果'); finishListen([]); } };
-      recog.start();
+      recog.onend = () => {
+        if (!listening) return;
+        if (lastInterim) {
+          log('聽-結果(中途猜測)', lastInterim + ' ← 最終結果沒出來，拿中途的猜測來判');
+          finishListen([lastInterim]);
+        } else {
+          log('聽-結束', '沒有任何辨識結果');
+          finishListen([]);
+        }
+      };
+      // 稍微延後再開，讓上一輪的辨識與語音完全停下來
+      setTimeout(() => { try { if (listening && recog) recog.start(); } catch (e) { log('聽-錯誤', 'start 失敗 ' + e); finishListen([]); } }, 180);
       return true;
     } catch (e) {
       if (dictation) { micMode = 'dictation'; listening = false; return startListen(onHeard); }
@@ -665,30 +688,65 @@ function judgeLog(list, w) {
   return ok;
 }
 
-/** heardList: 辨識出的幾種可能；sibs: 同組其他單字（gum / gun 不能互相放水） */
+/** 發音指紋：把拼法不同但唸起來一樣的字變成同一個代碼。
+ *  kick / kik / Kik → 同一個；kit → 不同。這樣 Google 聽成怪拼法也救得回來。 */
+function phon(s) {
+  let w = norm(s).replace(/ /g, '');
+  if (!w) return '';
+  w = w.replace(/^(kn|gn|pn|wr)/, 'n')
+       .replace(/ck/g, 'k')
+       .replace(/ph/g, 'f')
+       .replace(/sh/g, 'S')
+       .replace(/ch/g, 'X')
+       .replace(/th/g, 'T')
+       .replace(/wh/g, 'w')
+       .replace(/qu/g, 'kw')
+       .replace(/c(?=[eiy])/g, 's')
+       .replace(/c/g, 'k')
+       .replace(/x/g, 'ks')
+       .replace(/z/g, 's')
+       .replace(/v/g, 'f')
+       .replace(/e$/, '');
+  if (!w) return '';
+  w = w.replace(/[aeiouy]/g, 'A');   // 母音不分哪一個，但要保留位置（否則 cookie 會等於 kick）
+  w = w.replace(/(.)\1+/g, '$1');    // 疊字壓成一個
+  return w;
+}
+
+/** heardList: 辨識出的幾種可能；sibs: 同組其他單字（gum / gun 不能互相放水）
+ *  原則：寧可寬鬆一點。小孩念對卻被判錯，比偶爾放水一次傷害大得多。 */
 function judge(heardList, word, sibs) {
   const t = norm(word.en);
+  const tNoSpace = t.replace(/ /g, '');
+  const tP = phon(t);
   const others = sibs.map(norm).filter(s => s !== t);
+  const otherP = others.map(phon);
   const alts = (word.alt || []).map(norm);
+  const phonSafe = otherP.indexOf(tP) === -1;   // 同組沒有唸起來一樣的字，才敢用發音比對
+
   for (const raw of heardList) {
     const h = norm(raw);
     if (!h) continue;
-    if (h === t) return true;
-    if (others.indexOf(h) > -1) continue;
-    // 他拼字母時，辨識結果會像 "j a c k" 或 "j a c k jack"
-    const hd = h.replace(/ /g, ''), td = t.replace(/ /g, '');
-    if (others.some(o => o.replace(/ /g, '') === hd)) continue;
-    if (hd === td || hd === td + td) return true;
-    if (alts.indexOf(h) > -1) return true;
-    const parts = h.split(' ');
-    if (t.indexOf(' ') > -1) {
-      if (h.indexOf(t) > -1) return true;
-      if (lev(h, t) <= 2) return true;
-    } else {
-      if (parts.indexOf(t) > -1) return true;
-      if (alts.some(a => parts.indexOf(a) > -1)) return true;
-      if (t.length >= 4) {
-        for (const p of parts) if (lev(p, t) <= 1 && !others.some(o => lev(p, o) <= 1)) return true;
+    const tokens = h.split(' ').filter(Boolean);
+    const cands = tokens.length > 1 ? tokens.concat([h]) : tokens;
+
+    // 1. 完全一樣（含多字裡面有正解，例如「cooking King」→ king）
+    if (cands.indexOf(t) > -1) return true;
+    // 2. 整串去掉空白後一樣（他拼字母：j a c k）
+    if (h.replace(/ /g, '') === tNoSpace) return true;
+    // 3. 只講了同組的「別的字」→ 真的念錯，不放水
+    if (tokens.length === 1 && others.indexOf(h) > -1) continue;
+    // 4. 自己指定的可接受拼法
+    if (cands.some(c => alts.indexOf(c) > -1)) return true;
+    // 5. 片語：有包含就算
+    if (t.indexOf(' ') > -1 && (h.indexOf(t) > -1 || lev(h, t) <= 2)) return true;
+    // 6. 發音一樣（kick ↔ Kik ↔ kik）
+    if (phonSafe && cands.some(c => { const p = phon(c); return p && p === tP; })) return true;
+    // 7. 差一個字母，而且比同組任何字都更接近
+    if (t.length >= 4) {
+      for (const c of cands) {
+        const d = lev(c, t);
+        if (d <= 1 && others.every(o => lev(c, o) > d)) return true;
       }
     }
   }
@@ -706,6 +764,7 @@ const el = {
   stage: document.getElementById('stage'),
   btnQuiz: document.getElementById('btnQuiz'),
   btnPics: document.getElementById('btnPics'),
+  btnLog: document.getElementById('btnLog'),
   btnParent: document.getElementById('btnParent'),
   picInput: document.getElementById('picInput')
 };
@@ -725,7 +784,26 @@ function shuffle(arr) {
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
-function stopAll() { stopSpeech(); if (listening) { listening = false; stopListen(); } }
+function stopAll() { stopSpeech(); clearIdle(); if (listening) { listening = false; stopListen(); } }
+
+/* ---------- 他看不懂畫面上的中文，所以用聲音告訴他怎麼按 ---------- */
+let welcomed = false;
+let idleTimer = null;
+function clearIdle() { clearTimeout(idleTimer); idleTimer = null; }
+/** 等太久沒動作就提醒他按麥克風，最多提醒兩次就不吵他 */
+function armIdle() {
+  clearIdle();
+  if (!settings.zhHints || !micAvailable()) return;
+  state.idleCount = 0;
+  const tick = () => {
+    if (state.mode !== 'play' || state.step !== 'ask') return;
+    state.idleCount++;
+    if (state.idleCount > 2) return;
+    zh(state.idleCount === 1 ? '準備好了嗎？按下面那個綠色的麥克風，說說看。' : '按綠色的麥克風喔。');
+    idleTimer = setTimeout(tick, 16000);
+  };
+  idleTimer = setTimeout(tick, 13000);
+}
 
 /* ========================= 畫面 ========================= */
 function renderTabs() {
@@ -759,7 +837,7 @@ function renderTabs() {
 function renderStatus() {
   const s = cardSet();
   const p = setProgress(s.id);
-  el.statusbar.hidden = (state.mode === 'parent');
+  el.statusbar.hidden = (state.mode === 'parent' || state.mode === 'log');
   el.roundTag.textContent = (p.round - 1) >= settings.rounds
     ? '這組完成 ✔'
     : '第 ' + p.round + ' / ' + settings.rounds + ' 輪 · ' + (state.phase === 'pic' ? '看圖片' : '看英文字');
@@ -790,6 +868,7 @@ function render() {
   renderTabs();
   renderStatus();
   if (state.mode === 'parent') return renderParent();
+  if (state.mode === 'log') return renderLog();
   if (state.mode === 'phase') return renderPhase();
   if (state.mode === 'done') return renderDone();
   if (state.mode === 'quiz') return renderQuiz();
@@ -876,6 +955,7 @@ function askCurrent() {
   const w = curWord();
   if (!w) return;
   state.step = 'ask'; state.heard = ''; state.lineTone = '';
+  state.coach = false; state.coachTries = 0;
   const pic = (state.phase === 'pic');
   const sp = spellMode();
   state.line = sp
@@ -883,20 +963,26 @@ function askCurrent() {
     : (pic ? '看圖片，用英文說說看' : '這個字怎麼念？');
   render();
   if (!settings.zhHints) return;
-  const base = sp
+  let base = sp
     ? (pic ? '看這張圖，先一個字母一個字母拼出來，再念整個名字。' : '先把字母拼出來，再念整個名字。')
     : (pic ? '看這張圖，用英文說說看。' : '這個字怎麼念？念念看。');
-  zh(base + (micAvailable() ? '準備好就按下面的麥克風。' : ''));
+  if (!welcomed) {
+    welcomed = true;
+    base = '哈囉！我們來複習單字卡囉。' + base;
+  }
+  zh(base + (micAvailable() ? '說之前，先按下面那個綠色的麥克風。' : ''), armIdle);
 }
 
 function listenNow() {
   const w = curWord();
-  stopSpeech();
+  stopSpeech(); clearIdle();
+  const inCoach = state.coach;
   state.step = 'listening';
-  state.line = '我在聽……大聲說一次';
+  state.line = inCoach ? ('換你念：' + w.en) : '我在聽……大聲說一次';
   state.lineTone = ''; state.heard = '';
   render();
-  if (!startListen(list => handleHeard(list, w))) { state.step = 'ask'; render(); }
+  const ok = startListen(list => inCoach ? handleCoachHeard(list, w) : handleHeard(list, w));
+  if (!ok) { state.step = inCoach ? 'repeat' : 'ask'; render(); }
 }
 
 function handleHeard(list, w) {
@@ -912,29 +998,44 @@ function handleHeard(list, w) {
   zh('再試一次看看。');
 }
 
-/** 複誦模式：AI 念一次 → 叫他跟著念 → 再聽一次 */
+/** 複誦模式：AI 念一次 → 叫他跟著念 → 再聽一次。最多兩次就放他過，不會卡住。 */
 function coachRepeat() {
   const w = curWord();
+  state.coach = true;
+  state.coachTries = 0;
   state.step = 'repeat';
   state.line = (spellMode() ? '聽我拼：' : '聽我念：') + w.en;
   state.lineTone = '';
   render();
   sayWord(w, () => {
-    zh(spellMode() ? '換你拼拼看，再念一次。' : '換你念念看。', () => {
+    zh(spellMode() ? '換你拼拼看，再念一次。' : '換你念念看。按綠色的麥克風。', () => {
       if (!micAvailable()) { state.line = '跟著念一次：' + w.en; render(); return; }
       state.step = 'listening';
       state.line = '換你念：' + w.en;
       render();
-      startListen(list => {
-        state.heard = (list[0] || '').trim();
-        if (judgeLog(list, w)) { succeed(w, true); return; }
-        log('流程', '複誦後還是沒過，標記為不熟：' + w.en);
-        markShaky(w);
-        beep('no');
-        reveal('沒關係，這個字我們多練幾次');
-      });
+      startListen(list => handleCoachHeard(list, w));
     });
   });
+}
+
+/** 複誦模式聽到的結果。跟 handleHeard 分開，否則他再按麥克風會一直被丟回複誦、永遠過不了關。 */
+function handleCoachHeard(list, w) {
+  state.heard = (list[0] || '').trim();
+  if (judgeLog(list, w)) { succeed(w, true); return; }
+  state.coachTries = (state.coachTries || 0) + 1;
+  beep('no');
+  if (state.coachTries >= 2) {
+    log('流程', '複誦 ' + state.coachTries + ' 次還是沒過，標記為不熟並往下一張：' + w.en);
+    markShaky(w);
+    reveal('沒關係，這個字我們多練幾次');
+    return;
+  }
+  log('流程', '複誦第 ' + state.coachTries + ' 次沒過，再帶一次：' + w.en);
+  state.step = 'repeat';
+  state.line = '再跟我念一次：' + w.en;
+  state.lineTone = 'oops';
+  render();
+  sayWord(w, () => { if (settings.zhHints) zh('換你念念看。按綠色的麥克風。'); });
 }
 
 function succeed(w, afterCoach) {
@@ -955,7 +1056,7 @@ function reveal(msg) {
   state.line = msg || '';
   state.lineTone = '';
   render();
-  sayWord(w);
+  sayWord(w, () => { if (settings.zhHints) zh('按右下角綠色的箭頭，換下一張。'); });
 }
 
 function nextCard() {
@@ -1416,33 +1517,12 @@ function renderParent() {
     '麥克風狀態：' + (micMode === 'native' ? '瀏覽器語音辨識' : micMode === 'dictation' ? 'Claude 語音輸入（備用）' : '不支援 —— 網址要是 https 或 localhost 才給麥克風') + '。<br>' +
     '辨識對小朋友的發音本來就不會百分之百準，念兩次還是過不了會自動變成「我念一次、他跟著念」，不會卡住他。真的誤判就按「✓ 他念對了」。');
 
-  /* --- 測試紀錄 --- */
+  /* --- 測試紀錄（在上面工具列的 🐞 按鈕） --- */
   add('h3', null, '測試紀錄');
-  add('p', 'note',
-    '手機上看不到瀏覽器的錯誤訊息，所以這裡自己留了一份。<br>' +
-    '測完語音之後按「複製全部」，整份貼給 Claude，它就知道麥克風有沒有收到音、聽成什麼、為什麼判錯。');
-  const logPre = document.createElement('pre');
-  logPre.className = 'logbox';
-  logPre.id = 'logBox';
-  logPre.textContent = logText();
-  sheet.appendChild(logPre);
-  const logRow = add('div', 'row',
-    '<button class="mini" type="button" id="btnLogCopy">📋 複製全部（' + LOG.length + ' 筆）</button>' +
-    '<button class="mini" type="button" id="btnLogRefresh">↻ 更新</button>' +
-    '<button class="mini danger" type="button" id="btnLogClear">清空</button>');
-  logRow.querySelector('#btnLogCopy').onclick = async () => {
-    const txt = logText();
-    try { await navigator.clipboard.writeText(txt); toast('紀錄複製好了，貼給 Claude'); }
-    catch (e) {
-      logPre.textContent = txt;
-      const r = document.createRange(); r.selectNodeContents(logPre);
-      const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
-      toast('請長按選取複製');
-    }
-  };
-  logRow.querySelector('#btnLogRefresh').onclick = () => { logPre.textContent = logText(); logPre.scrollTop = logPre.scrollHeight; };
-  logRow.querySelector('#btnLogClear').onclick = () => { LOG.length = 0; log('紀錄', '已清空'); logPre.textContent = logText(); };
-  logPre.scrollTop = logPre.scrollHeight;
+  const logJump = add('div', 'row',
+    '<span class="note">已記錄 ' + LOG.length + ' 筆，要貼給 Claude 看的話從這裡進去</span>' +
+    '<button class="mini" type="button" id="btnGoLog">🐞 打開測試紀錄</button>');
+  logJump.querySelector('#btnGoLog').onclick = () => { state.mode = 'log'; render(); };
 
   const back = document.createElement('div');
   back.className = 'actions';
@@ -1460,6 +1540,55 @@ function renderParent() {
   };
 }
 
+/* ---------- 測試紀錄（獨立頁，工具列 🐞） ---------- */
+function renderLog() {
+  stopAll();
+  el.stage.innerHTML = '';
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet';
+  sheet.innerHTML =
+    '<div class="row"><h2>測試紀錄</h2><span class="note">' + LOG.length + ' 筆</span></div>' +
+    '<p class="note"><strong>按「複製全部」，再貼到跟 Claude 的對話裡就好。</strong><br>' +
+    '它會看出麥克風有沒有收到音、聽成什麼字、為什麼判對或判錯。</p>';
+  el.stage.appendChild(sheet);
+
+  const pre = document.createElement('pre');
+  pre.className = 'logbox';
+  pre.textContent = logText();
+  sheet.appendChild(pre);
+
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML =
+    '<button class="mini" type="button" id="lgCopy">📋 複製全部</button>' +
+    '<button class="mini" type="button" id="lgRef">↻ 更新</button>' +
+    '<button class="mini danger" type="button" id="lgClr">清空重測</button>';
+  sheet.appendChild(row);
+
+  row.querySelector('#lgCopy').onclick = async () => {
+    const txt = logText();
+    let done = false;
+    try { await navigator.clipboard.writeText(txt); done = true; } catch (e) {}
+    if (done) { toast('複製好了，貼給 Claude'); return; }
+    // 有些手機瀏覽器不給剪貼簿，就幫他把整段選起來
+    try {
+      const r = document.createRange(); r.selectNodeContents(pre);
+      const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      toast('已選取，長按畫面選「複製」');
+    } catch (e) { toast('請長按紀錄選取複製'); }
+  };
+  row.querySelector('#lgRef').onclick = () => { pre.textContent = logText(); pre.scrollTop = pre.scrollHeight; };
+  row.querySelector('#lgClr').onclick = () => { LOG.length = 0; log('紀錄', '已清空，可以重新測一次'); pre.textContent = logText(); toast('清空了，再測一次'); };
+
+  pre.scrollTop = pre.scrollHeight;
+
+  const back = document.createElement('div');
+  back.className = 'actions';
+  back.innerHTML = '<button class="b-got b-wide" type="button">← 回去練習</button>';
+  back.firstChild.onclick = () => { state.mode = 'play'; startRound(); };
+  el.stage.appendChild(back);
+}
+
 function toast(msg) {
   const t = document.createElement('div');
   t.className = 'toast'; t.textContent = msg;
@@ -1469,6 +1598,7 @@ function toast(msg) {
 
 /* ========================= 啟動 ========================= */
 el.btnQuiz.onclick = () => startQuiz();
+el.btnLog.onclick = () => { stopAll(); state.mode = 'log'; render(); };
 el.btnParent.onclick = () => { stopAll(); state.mode = 'parent'; render(); };
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopAll(); });
 
