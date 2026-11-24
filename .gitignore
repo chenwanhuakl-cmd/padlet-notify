@@ -20,3 +20,23 @@ practice/exams/*
 .vscode/
 .idea/
 .DS_Store
+
+# context-memory: shared files
+!.context-memory/
+!.context-memory/schema.yaml
+!.context-memory/config.yaml
+!.context-memory/project.yaml
+!.context-memory/handoff/
+!.context-memory/handoff/*.md
+# context-memory: local files
+.context-memory/state.yaml
+.context-memory/history.md
+.context-memory/last-compact.md
+.context-memory/events.sqlite
+.context-memory/metadata.json
+.context-memory/diagnostics.log
+.context-memory/single-session-guard.json
+.claude/settings.local.json
+.context-memory/*.lock
+.context-memory/*.tmp
+.context-memory/*.bak-*
