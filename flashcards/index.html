@@ -259,16 +259,17 @@ const UNITS = [
         { en: 'twelve', zh: '十二', pic: '🕛' }
       ]},
       { id: 'u5-i', name: 'I 開頭', words: [      // 14-7 ~ 14-10
+        // alt = 實測中 Google 固定會聽成的拼法，當成念對
         { en: 'ink',    zh: '墨水',     pic: '🖋️', alt: ['inc'] },
         { en: 'insect', zh: '昆蟲',     pic: '🐞' },
         { en: 'Indian', zh: '印地安人', pic: '🪶' },
-        { en: 'igloo',  zh: '冰屋',     pic: '🏠' }
+        { en: 'igloo',  zh: '冰屋',     pic: '🏠', alt: ['equally', 'eagle', 'iglu', 'ecodoo'] }
       ]},
       { id: 'u5-j', name: 'J 開頭', words: [      // 14-11 ~ 14-14
-        { en: 'jam',  zh: '果醬',   pic: '🍓' },
+        { en: 'jam',  zh: '果醬',   pic: '🍓', alt: ['jim'] },
         { en: 'jump', zh: '跳',     pic: '🤸' },
         { en: 'jet',  zh: '噴射機', pic: '✈️' },
-        { en: 'jar',  zh: '玻璃罐', pic: '🫙' }
+        { en: 'jar',  zh: '玻璃罐', pic: '🫙', alt: ['jaw'] }
       ]}
     ]
   },
@@ -284,15 +285,15 @@ const UNITS = [
       ]},
       { id: 'u6-k', name: 'K 開頭', words: [      // 13-6 ~ 13-9
         { en: 'kiss', zh: '親親',   pic: '😘' },
-        { en: 'kit',  zh: '急救箱', pic: '🧰' },
+        { en: 'kit',  zh: '急救箱', pic: '🧰', alt: ['cheetah', 'keith'] },
         { en: 'king', zh: '國王',   pic: '🤴' },
-        { en: 'kick', zh: '踢',     pic: '⚽' }
+        { en: 'kick', zh: '踢',     pic: '⚽', alt: ['kik', 'chico', 'chica', 'kiko'] }
       ]},
       { id: 'u6-l', name: 'L 開頭', words: [      // 13-10 ~ 13-13
-        { en: 'lamp', zh: '檯燈',   pic: '💡' },
-        { en: 'leg',  zh: '腿',     pic: '🦵' },
-        { en: 'lips', zh: '嘴唇',   pic: '👄', alt: ['lip'] },
-        { en: 'lock', zh: '鎖',     pic: '🔒' }
+        { en: 'lamp', zh: '檯燈',   pic: '💡', alt: ['limp'] },
+        { en: 'leg',  zh: '腿',     pic: '🦵', alt: ['lake', 'lego', 'lag'] },
+        { en: 'lips', zh: '嘴唇',   pic: '👄', alt: ['lip', 'links'] },
+        { en: 'lock', zh: '鎖',     pic: '🔒', alt: ['luck'] }
       ]}
     ]
   }
@@ -555,7 +556,18 @@ document.addEventListener('pointerdown', unlock, { once: true });
 /* ========================= 聽（語音辨識） ========================= */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let micMode = SR ? 'native' : 'none';
-let dictation = null, recog = null, listening = false, heardHandler = null, listenTimer = null, lastInterim = '';
+let dictation = null, recog = null, listening = false, heardHandler = null, listenTimer = null, lastInterim = '', lastListenKey = '';
+
+/** 逾時之後才送到的辨識結果。只要還停在同一張卡、還沒翻面，就補判一次，
+ *  否則他會覺得「我明明念了卻沒反應」（實測 log 裡 and tall、cooking 都是這樣被丟掉的）。 */
+function lateResult(list) {
+  if (listening || !list || !list.length) return;
+  const w = curWord();
+  if (!w || state.mode !== 'play' || state.step === 'reveal') return;
+  if (w._key !== lastListenKey) return;
+  log('聽-遲到結果', '逾時後才收到，補判一次');
+  if (state.coach) handleCoachHeard(list, w); else handleHeard(list, w);
+}
 
 (async function initDictation() {
   try {
@@ -577,10 +589,11 @@ function startListen(onHeard) {
   heardHandler = onHeard;
   listening = true;
   clearTimeout(listenTimer);
+  lastListenKey = (curWord() || {})._key || '';
   log('聽-開始', { 模式: micMode, 目標字: (curWord() || {}).en, 階段: state.phase });
   listenTimer = setTimeout(() => {
-    if (listening) { log('聽-逾時', '7 秒內沒收到結果'); stopListen(); finishListen([]); }
-  }, 7000);
+    if (listening) { log('聽-逾時', '10 秒內沒收到結果'); stopListen(); finishListen([]); }
+  }, 10000);
 
   if (micMode === 'native') {
     try {
@@ -613,6 +626,7 @@ function startListen(onHeard) {
         }
         if (!gotFinal) return;          // 還在猜，等最終結果
         log('聽-結果', detail.join(' | ') || '空的');
+        if (!listening) { lateResult(out); return; }
         finishListen(out);
       };
       recog.onerror = ev => {
@@ -681,10 +695,15 @@ function lev(a, b) {
   }
   return prev[n];
 }
-/** 判斷 + 留紀錄 */
-function judgeLog(list, w) {
-  const ok = judge(list, w, siblings());
-  log('判斷', { 目標: w.en, 聽到: list, 結果: ok ? '✔ 算對' : '✘ 算錯', 同組字: siblings().join('/') });
+/** 判斷 + 留紀錄。loose = 第二次以後或複誦時，標準再放寬一階 */
+function judgeLog(list, w, loose) {
+  const ok = judge(list, w, siblings(), loose);
+  log('判斷', {
+    目標: w.en, 聽到: list,
+    結果: ok ? '✔ 算對' : '✘ 算錯',
+    標準: loose ? '寬鬆' : '一般',
+    同組字: siblings().join('/')
+  });
   return ok;
 }
 
@@ -715,7 +734,7 @@ function phon(s) {
 
 /** heardList: 辨識出的幾種可能；sibs: 同組其他單字（gum / gun 不能互相放水）
  *  原則：寧可寬鬆一點。小孩念對卻被判錯，比偶爾放水一次傷害大得多。 */
-function judge(heardList, word, sibs) {
+function judge(heardList, word, sibs, loose) {
   const t = norm(word.en);
   const tNoSpace = t.replace(/ /g, '');
   const tP = phon(t);
@@ -742,11 +761,29 @@ function judge(heardList, word, sibs) {
     if (t.indexOf(' ') > -1 && (h.indexOf(t) > -1 || lev(h, t) <= 2)) return true;
     // 6. 發音一樣（kick ↔ Kik ↔ kik）
     if (phonSafe && cands.some(c => { const p = phon(c); return p && p === tP; })) return true;
-    // 7. 差一個字母，而且比同組任何字都更接近
-    if (t.length >= 4) {
+    // 7. 多了 s 之類的字尾（jet → Jets、insect → insects）
+    if (cands.some(c => (c === t + 's' || c === t + 'es' || c === t + 'ed') &&
+                        !others.some(o => c === o || c === o + 's'))) return true;
+    // 8. 整個目標字被包在裡面（ink → pink、king → cooking）
+    if (t.length >= 3 && cands.some(c => c.length > t.length && c.indexOf(t) > -1 &&
+                                         !others.some(o => c.indexOf(o) > -1))) return true;
+    // 9. 差一個字母，而且比同組任何字都更接近（短字也適用，靠「更接近」擋住 gum/gun）
+    if (t.length >= 3) {
       for (const c of cands) {
         const d = lev(c, t);
         if (d <= 1 && others.every(o => lev(c, o) > d)) return true;
+      }
+    }
+    // 10. 寬鬆標準：第二次嘗試或複誦時才啟用。他已經聽過正確發音了，門檻放低一點，
+    //     避免他其實念對卻一直過不了關（大人只好一直幫他按「他念對了」）。
+    if (loose) {
+      for (const c of cands) {
+        if (c.length < 2) continue;
+        const d = lev(c, t);
+        if (d <= 2 && others.every(o => lev(c, o) > d)) return true;
+        const cP = phon(c);
+        if (phonSafe && cP && tP && cP[0] === tP[0] && Math.abs(cP.length - tP.length) <= 1 &&
+            lev(cP, tP) <= 1 && otherP.every(o => lev(cP, o) > lev(cP, tP))) return true;
       }
     }
   }
@@ -939,8 +976,11 @@ function renderCard() {
       '<button class="b-again" type="button">↻<span class="b-sub">不會，跳過</span></button>' +
       '<button class="b-got" type="button">✓<span class="b-sub">他念對了</span></button>';
     actions.children[0].onclick = () => { stopAll(); state.tries = 0; coachRepeat(); };
-    actions.children[1].onclick = () => { markShaky(w); stopAll(); reveal('沒關係，我們下次再練'); };
-    actions.children[2].onclick = () => { stopAll(); succeed(w); };
+    actions.children[1].onclick = () => { log('大人代判', '按了「不會，跳過」：' + w.en); markShaky(w); stopAll(); reveal('沒關係，我們下次再練'); };
+    actions.children[2].onclick = () => {
+      log('大人代判', '按了「他念對了」：' + w.en + '（程式聽到：' + (state.heard || '沒收到') + '）← 這表示程式判錯了');
+      stopAll(); succeed(w);
+    };
   }
   el.stage.appendChild(actions);
 }
@@ -955,7 +995,7 @@ function askCurrent() {
   const w = curWord();
   if (!w) return;
   state.step = 'ask'; state.heard = ''; state.lineTone = '';
-  state.coach = false; state.coachTries = 0;
+  state.coach = false; state.coachTries = 0; state.blanks = 0;
   const pic = (state.phase === 'pic');
   const sp = spellMode();
   state.line = sp
@@ -987,9 +1027,26 @@ function listenNow() {
 
 function handleHeard(list, w) {
   state.heard = (list[0] || '').trim();
-  if (judgeLog(list, w)) { succeed(w); return; }
+  // 一個字都沒收到 ≠ 念錯。log 顯示他明明有說話，只是 Google 沒認出來，不能算他失敗。
+  if (!list.length) {
+    state.blanks = (state.blanks || 0) + 1;
+    if (state.blanks <= 2) {
+      log('流程', '沒收到任何字（第 ' + state.blanks + ' 次），不算錯，請他再說一次');
+      state.step = 'ask';
+      state.line = '我沒聽清楚，再說一次';
+      state.lineTone = 'oops';
+      render();
+      zh('我沒有聽清楚，再說一次好嗎？按綠色的麥克風。', armIdle);
+      return;
+    }
+    log('流程', '連續三次沒收到聲音，改成我念一次給他聽');
+    coachRepeat();
+    return;
+  }
+  state.blanks = 0;
+  if (judgeLog(list, w, state.tries >= 1)) { succeed(w); return; }
   state.tries++;
-  if (list.length === 0 || state.tries >= MAX_TRIES) { log('流程', '轉成複誦模式（我念一次、他跟著念）'); coachRepeat(); return; }
+  if (state.tries >= MAX_TRIES) { log('流程', '轉成複誦模式（我念一次、他跟著念）'); coachRepeat(); return; }
   state.step = 'ask';
   state.line = '再試一次看看';
   state.lineTone = 'oops';
@@ -1021,7 +1078,21 @@ function coachRepeat() {
 /** 複誦模式聽到的結果。跟 handleHeard 分開，否則他再按麥克風會一直被丟回複誦、永遠過不了關。 */
 function handleCoachHeard(list, w) {
   state.heard = (list[0] || '').trim();
-  if (judgeLog(list, w)) { succeed(w, true); return; }
+  // 複誦時他剛聽過正確發音，標準放到最寬
+  if (list.length && judgeLog(list, w, true)) { succeed(w, true); return; }
+  if (!list.length) {
+    state.blanks = (state.blanks || 0) + 1;
+    if (state.blanks <= 2) {
+      log('流程', '複誦時沒收到聲音，不算次數，再給他一次');
+      state.step = 'repeat';
+      state.line = '我沒聽清楚，再念一次：' + w.en;
+      state.lineTone = 'oops';
+      render();
+      zh('我沒有聽清楚，再念一次。按綠色的麥克風。');
+      return;
+    }
+  }
+  state.blanks = 0;
   state.coachTries = (state.coachTries || 0) + 1;
   beep('no');
   if (state.coachTries >= 2) {
