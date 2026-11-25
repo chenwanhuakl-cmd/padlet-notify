@@ -6,6 +6,12 @@ on:
     - cron: "0 10 * * *"
     # 台灣時間每日 08:00（UTC 00:00）：只讀取 Telegram 的個人支出訊息
     - cron: "0 0 * * *"
+  # 外部排程（cron-job.org）準時觸發用。
+  # GitHub 自己的排程 11/20 起常遲到 8～12 小時，單靠它會半夜才收到團購提醒。
+  #   ipluso          → 傍晚那班（取貨提醒／統計）
+  #   ipluso-personal → 早上那班（只讀個人支出訊息）
+  repository_dispatch:
+    types: [ipluso, ipluso-personal]
   workflow_dispatch:
     inputs:
       range_start:
@@ -39,7 +45,7 @@ jobs:
           IPLUSO_COOKIE: ${{ secrets.IPLUSO_COOKIE }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-        run: python ipluso.py ${{ github.event.schedule == '0 0 * * *' && '--personal-only' || '' }} ${{ inputs.range_start && format('--range {0} {1}', inputs.range_start, inputs.range_end) || '' }}
+        run: python ipluso.py ${{ (github.event.schedule == '0 0 * * *' || github.event.action == 'ipluso-personal') && '--personal-only' || '' }} ${{ inputs.range_start && format('--range {0} {1}', inputs.range_start, inputs.range_end) || '' }}
 
       - name: Save state
         if: always()
