@@ -5,9 +5,11 @@
   - 沒有設定或抓取失敗 → Open-Meteo（不需授權碼，逐小時降雨機率）
 
 只在上班日發（依台灣政府行事曆，含補班日，跟電子聯絡簿用同一套判斷）。
-GitHub 排程常會延遲、偶爾整個跳過，所以排了三次啟動（05:50、06:15、06:40），
+準時觸發靠外部排程（cron-job.org）打 repository_dispatch；GitHub 自己的排程只當備援
+（排了 05:50、06:15、06:40 三次，11/20 起常遲到 4～8 小時）。
 第一個啟動的等到 07:05 發，發完記在 weather_state.json，後面的看到今天已發就結束；
-如果啟動時已經超過 07:05，就馬上發。
+如果啟動時已經超過 07:05 就馬上發，但超過 09:00 就整個放棄不發
+（中午才說「出門前記得關窗」沒有意義）。
 
 環境變數：
   CWA_KEY          氣象署開放資料授權碼（選填）
@@ -30,6 +32,7 @@ from check import is_school_day
 STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "weather_state.json")
 TW = datetime.timezone(datetime.timedelta(hours=8))
 SEND_AT = datetime.time(7, 5)
+GIVE_UP_AT = datetime.time(9, 0)  # 排程遲到超過這個時間就不發了
 FROM_HOUR, TO_HOUR = 6, 19
 RAIN_POP = 30  # 降雨機率達到這個 % 就提醒關窗
 DISTRICT = "中山區"
@@ -148,6 +151,9 @@ def main():
         if json.load(open(STATE_FILE, encoding="utf-8")).get("sent") == today.isoformat():
             print("今天的降雨提醒已經發過了")
             return
+    if "--now" not in sys.argv and now.time() > GIVE_UP_AT:
+        print(f"現在 {now:%H:%M} 已經超過 {GIVE_UP_AT:%H:%M}（排程遲到），這則提醒沒意義了，不發")
+        return
 
     slots, source = None, ""
     if os.environ.get("CWA_KEY"):
