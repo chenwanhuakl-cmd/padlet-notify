@@ -9,6 +9,11 @@
   訂單列表沒有日期，所以新的已付款訂單會再查一次明細的 shipping_payment_time，
   記在 ipluso_state.json（只存雜湊值、金額與付款日），之後不再重查。
 
+傍晚那班（取貨提醒與統計）同一天只發一次：準時觸發靠外部排程（cron-job.org）打
+  repository_dispatch，GitHub 自己遲到的排程之後還會再跑一次，用 ipluso_state.json 的
+  daily_sent 擋掉；遲到到 16:00～23:00 以外才跑（例如隔天凌晨）也直接跳過，
+  免得半夜收到「今天 19:20 順路取貨」。
+
 個人支出：傳「-280」給 Telegram bot，這 280 元就不算進家用預算（傳「+280」可加回）。
   每天 08:00、18:00 執行時讀取，日期預設是傳訊息那天；
   事後補登就在金額後面加月/日，例如「-280 11/14」（只能補過去的日期）。
@@ -39,6 +44,7 @@ GROUP_BUDGET = 2500  # 每月團購吃吃喝喝估算預算
 STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ipluso_state.json")
 DETAIL_URL = "https://www.iplusonego.com/api/index.php/shippings/buyer_shipping_detail/{serial_id}"
 BIWEEKLY_ANCHOR = datetime.date(2026, 11, 1)  # 雙週報告的基準星期日，之後每 14 天一次
+DAILY_FROM_HOUR, DAILY_TO_HOUR = 16, 23  # 傍晚那班只在這個時段內發，排程遲太久就跳過
 
 
 def fetch_api(url, cookie):
@@ -249,16 +255,23 @@ def build_month_end_report(spent, start, end):
 # 主程式 logic
 # ----------------------------------------------------------------------
 def main():
-    today = datetime.datetime.now(TW).date()
+    now = datetime.datetime.now(TW)
+    today = now.date()
     yesterday = today - datetime.timedelta(days=1)
 
     is_test = "--test" in sys.argv
     is_dry = "--dry" in sys.argv
+    is_manual = is_test or is_dry or "--range" in sys.argv
 
     def output(msg):
         print(msg)
         if not is_dry:
             send_telegram(msg)
+
+    def save_state():
+        if not is_dry:
+            with open(STATE_FILE, "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=0, sort_keys=True)
 
     # 1. 抓取 API 資料
     # GitHub 沒設定的 Secret 會是空字串，所以用 or 帶入預設值
@@ -269,7 +282,15 @@ def main():
     # --personal-only：早上加跑一次，只讀個人支出訊息
     # （Telegram 只保留 24 小時內的訊息，一天只讀一次可能會漏）
     personal_only = "--personal-only" in sys.argv
-    if personal_only:
+    # 傍晚那班重複跑或遲到太久就只讀個人支出，不發取貨提醒與統計
+    skip_daily = ""
+    if not personal_only and not is_manual:
+        if (old_state or {}).get("daily_sent") == today.isoformat():
+            skip_daily = f"今天（{today}）的團購通知已經發過了"
+        elif not DAILY_FROM_HOUR <= now.hour < DAILY_TO_HOUR:
+            skip_daily = (f"現在 {now:%H:%M} 不在 {DAILY_FROM_HOUR}:00～{DAILY_TO_HOUR}:00 之間"
+                          "（排程遲到），不發當日團購通知")
+    if personal_only or skip_daily:
         state = dict(old_state or {"paid": {}})
     else:
         try:
@@ -288,10 +309,12 @@ def main():
         replies = []
     if replies:
         output("📝 已記錄個人支出（不列入團購預算）\n" + "\n".join(replies))
-    if state != old_state and not is_dry:
-        with open(STATE_FILE, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=0, sort_keys=True)
+    if state != old_state:
+        save_state()
     if personal_only:
+        return
+    if skip_daily:
+        print(skip_daily)
         return
 
     # 手動指定統計區間（測試用）：--range 2026-10-01 2026-10-14
@@ -316,6 +339,11 @@ def main():
     elif (today - BIWEEKLY_ANCHOR).days % 14 == 0:
         start = today - datetime.timedelta(days=14)
         output(build_biweekly_report(sum_paid(state, start, yesterday), start, yesterday))
+
+    # 都發完了才記，免得中途失敗整天就沒通知；記了之後 GitHub 遲到的排程就不會再發一次
+    if not is_manual:
+        state["daily_sent"] = today.isoformat()
+        save_state()
 
 
 if __name__ == "__main__":
