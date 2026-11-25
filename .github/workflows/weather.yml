@@ -8,6 +8,10 @@ on:
     - cron: "50 21 * * *"
     - cron: "15 22 * * *"
     - cron: "40 22 * * *"
+  # 外部排程（cron-job.org）準時觸發用。
+  # GitHub 自己的排程 11/20 起常遲到 4～8 小時，單靠它會在中午才收到提醒。
+  repository_dispatch:
+    types: [weather]
   workflow_dispatch:
 
 permissions:
